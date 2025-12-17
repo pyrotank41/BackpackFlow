@@ -30,11 +30,11 @@ Python is great for data science, but if you want to build a **web-based tracer*
 
 We solve these pain points with a **TypeScript-First, Config-Driven** architecture.
 
-### 1. The "Backpack" Analogy (Solves Black Box State)
+### 1. "Git for Your Agent's State" (Solves Black Box State)
 
-**Think of it as "Git for your agent's state."**
+**Think of Backpack as "Git for your agent's memory."**
 
-Just like Git tracks code changes with commits, Backpack tracks data changes:
+Just like Git tracks every code change with commits, Backpack tracks every data change in your agent:
 
 ```typescript
 // Git workflow           // Backpack workflow
@@ -44,12 +44,20 @@ git checkout abc123     → backpack.getSnapshotAtCommit('abc123')
 git diff                → backpack.diff(before, after)
 ```
 
-- ✅ **Immutable History** - Every data change is tracked
-- ✅ **Time-Travel Debugging** - Rewind to any previous state
-- ✅ **Complete Auditability** - Know exactly who changed what, when
-- ✅ **Access Control** - Nodes declare what they can read/write
+**Why "Backpack"?** Because your agent **carries explicit data** from node to node:
+- 🎒 Nothing is hidden - if it's not in the Backpack, the agent can't use it
+- 🔍 Every item is **tagged** with who packed it, when, and why
+- 🚫 Nodes declare **access permissions** - can't accidentally read debug data or PII
+- ⏱️ Complete **audit trail** - trace any data back to its source
 
-If Git made code development manageable, Backpack makes agent development manageable.
+**The Result:** Instead of debugging "black box" state mutations, you have:
+
+- ✅ **Immutable History** - Every data change is tracked (like Git commits)
+- ✅ **Time-Travel Debugging** - Rewind to any previous state (`git checkout`)
+- ✅ **Complete Auditability** - Know exactly who changed what, when (`git blame`)
+- ✅ **Access Control** - Nodes declare what they can read/write (unlike SharedStore)
+
+**If Git made code development manageable, Backpack makes agent development manageable.**
 
 ### 2. Code-First, UI-Ready (Solves the No-Code Wall)
 
