@@ -1,34 +1,129 @@
-# BackpackFlow
+# 🎒 BackpackFlow
 
-A config-driven LLM framework built on top of [PocketFlow](https://github.com/The-Pocket/PocketFlow-Typescript). BackpackFlow extends PocketFlow with configuration-driven workflows, utility functions, and enhanced developer experience.
+A TypeScript-first, config-driven LLM framework built on top of [PocketFlow](https://github.com/The-Pocket/PocketFlow-Typescript).
+
+**BackpackFlow** extends PocketFlow with a specific philosophy: **The Code is the Engine, the Config is the Steering Wheel.**
 
 [![npm version](https://badge.fury.io/js/backpackflow.svg)](https://badge.fury.io/js/backpackflow)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-> **⚠️ Work in Progress**: This is a side project that I work on as time permits. APIs are bound to change as the project evolves. Use at your own risk!
+> **⚠️ Work in Progress**: This is a side project under active development. APIs are bound to change as we build toward v2.0. Use at your own risk!
 
-## Status
+---
 
+## 🚫 The Pain Points (Why BackpackFlow Exists)
+
+Most LLM development hits three major walls:
+
+### 1. **The "Black Box" State**
+In many frameworks, context (history, variables) is handled by "magic." You don't know exactly what the LLM can "see" at any given step. Debugging feels like "doing animal experiments."
+
+### 2. **The "No-Code" Wall**
+Visual builders are great for demos, but when you need complex loops or custom logic, you hit a wall. You can't "eject" to code easily, and your flow is trapped in the GUI.
+
+### 3. **The Language Barrier**
+Python is great for data science, but if you want to build a **web-based tracer** or a **drag-and-drop UI**, you end up duplicating types between your Python backend and React frontend.
+
+---
+
+## 💡 The BackpackFlow Solution
+
+We solve these pain points with a **TypeScript-First, Config-Driven** architecture.
+
+### 1. "Git for Your Agent's State" (Solves Black Box State)
+
+**Think of Backpack as "Git for your agent's memory."**
+
+Just like Git tracks every code change with commits, Backpack tracks every data change in your agent:
+
+```typescript
+// Git workflow           // Backpack workflow
+git commit              → backpack.pack('data', value)
+git log                 → backpack.getHistory()
+git checkout abc123     → backpack.getSnapshotAtCommit('abc123')
+git diff                → backpack.diff(before, after)
+```
+
+**Why "Backpack"?** Because your agent **carries explicit data** from node to node:
+- 🎒 Nothing is hidden - if it's not in the Backpack, the agent can't use it
+- 🔍 Every item is **tagged** with who packed it, when, and why
+- 🚫 Nodes declare **access permissions** - can't accidentally read debug data or PII
+- ⏱️ Complete **audit trail** - trace any data back to its source
+
+**The Result:** Instead of debugging "black box" state mutations, you have:
+
+- ✅ **Immutable History** - Every data change is tracked (like Git commits)
+- ✅ **Time-Travel Debugging** - Rewind to any previous state (`git checkout`)
+- ✅ **Complete Auditability** - Know exactly who changed what, when (`git blame`)
+- ✅ **Access Control** - Nodes declare what they can read/write (unlike SharedStore)
+
+**If Git made code development manageable, Backpack makes agent development manageable.**
+
+### 2. Code-First, UI-Ready (Solves the No-Code Wall)
+
+We are building a "bridge" where **Code** and **Config** are interchangeable.
+
+- **The Engine:** You write complex logic in TypeScript Nodes
+- **The Steering Wheel:** The framework serializes your Nodes into JSON Config
+- **The Result:** Build a **UI Layer** that can visualize and edit your flow, but allows you to "eject" to raw code whenever needed
+
+```mermaid
+graph LR
+    A[TypeScript Code] -->|Compiles to| B(The Engine)
+    A -->|Serializes to| C{JSON Config}
+    C -->|Hydrates| B
+    C <-->|Syncs with| D[Future Web GUI]
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style D fill:#bbf,stroke:#333,stroke-width:2px
+```
+
+### 3. TypeScript-First (Solves the Language Barrier)
+
+Build your backend logic AND your web UI in the same language. Share types, schemas, and validation logic seamlessly.
+
+---
+
+## 📍 Current Status & Roadmap
+
+- **Current Version**: v1.2.0 - Event-driven streaming + Explicit LLM client injection
+- **Next Major Release**: v2.0.0 - "The Observable Agent" (Q1 2026)
 - **Phase**: Active Development
-- **Version**: 1.2.0 - Event-driven streaming + Explicit LLM client injection
-- **Stability**: Core features stabilizing, APIs may still evolve
-- **Development**: Regular updates and improvements
-- **Current Focus**: Agent workflows and tool integration
+- **Current Focus**: Backpack architecture, Telemetry system, Config serialization
 
-## Features
+👉 **[See Full Roadmap](./ROADMAP.md)** - Detailed v2.0 feature breakdown and timeline
 
-- **Configuration-Driven**: Define workflows using YAML/JSON configurations (⚠️ to be build)
-- **Utility Nodes**: Pre-built nodes for common LLM tasks
-- **TypeScript First**: Full TypeScript support with type safety
-- **Extensible**: Plugin system for custom nodes and integrations
+## ✨ Features
 
-### ✨ New in v1.2.0
+### Current Version (v1.2.0)
 
 - **🤖 Intelligent Agents**: Pre-built `AgentNode` with decision-making, tool calling, and response generation
 - **📡 Event-Driven Streaming**: Real-time progress updates and response streaming with type-safe events
-- **🔧 Tool Integration**: Seamless MCP (Model Context Protocol) tool discovery and execution
+- **🔧 MCP Integration**: Native support for the **Model Context Protocol** to discover and connect tools
 - **🎯 Multi-Provider Support**: OpenAI, Azure OpenAI, and extensible provider system
 - **⚡ Explicit Client Injection**: Full control over LLM clients for better testing and configuration
+- **📘 TypeScript First**: Full TypeScript support with type safety
+
+### 🚧 Coming in v2.0 (Q1 2026)
+
+**The Observable Agent Release** - Three foundational systems working together:
+
+#### 🎒 [PRD-001: Backpack Architecture](./docs/prds/PRD-001-backpack-architecture.md)
+- **Scoped State Management**: Nodes declare what they can read/write - no more "junk drawer" context
+- **Source Tracking**: Every piece of data carries metadata (who added it, when, why)
+- **Time-Travel Debugging**: Snapshot state at any point to see exactly what the agent "knew"
+- **State Sanitization**: Failed operations don't leak into downstream nodes
+
+#### 📡 [PRD-002: Standardized Telemetry](./docs/prds/PRD-002-telemetry-system.md)
+- **Automatic Event Emission**: See lifecycle events (`NODE_START`, `PREP`, `EXEC`, `END`) without writing logging code
+- **Debug Prompts**: Inspect exact prompts sent to LLMs via `PREP_COMPLETE` events
+- **Parse Error Visibility**: See raw LLM responses before JSON parsing fails
+- **Flow Visualization**: Export events to build visual debuggers and tracers
+
+#### 🔌 [PRD-003: Serialization Bridge](./docs/prds/PRD-003-serialization-bridge.md)
+- **Config-Driven Nodes**: Instantiate flows from JSON (enables drag-and-drop UIs)
+- **Type-Safe Configs**: Zod-validated schemas prevent broken deployments
+- **Dependency Injection**: Handle non-serializable objects (LLM clients) cleanly
+- **A/B Testing**: Swap node configs dynamically without code changes
 
 ## Project Structure
 
@@ -204,9 +299,19 @@ Want to contribute, get help, or share what you're building?
 
 👉 **[Join our community](./tutorials/building-ai-from-first-principles/JOIN_COMMUNITY.md)** - Connect with other developers building AI applications
 
-## Contributing
+## 🛠️ Contributing
 
 This is a personal side project that I work on as time permits. While contributions are welcome, please understand that development pace may be irregular and APIs may change frequently as the project evolves.
+
+### Want to Help Build v2.0?
+
+We're actively working on three major features. Pick one that matches your interests:
+
+1. **[PRD-001: Backpack Architecture](./docs/prds/PRD-001-backpack-architecture.md)** - State management (no LLM knowledge needed)
+2. **[PRD-002: Telemetry System](./docs/prds/PRD-002-telemetry-system.md)** - Observability & event streaming
+3. **[PRD-003: Serialization Bridge](./docs/prds/PRD-003-serialization-bridge.md)** - Config system (good for first-time contributors)
+
+👉 **[See the Roadmap](./ROADMAP.md)** for detailed task breakdowns and timelines.
 
 ## License
 
