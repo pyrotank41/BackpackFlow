@@ -13,10 +13,10 @@
 | **Phase 2: History & Time-Travel** | ✅ **Complete** | 29/29 passing | 100% |
 | **Phase 3: Access Control** | ✅ **Complete** | 26/26 passing | 100% |
 | **Phase 4: Namespace Query API** | ✅ **Complete** | 33/33 passing | 100% |
-| Phase 5: Graph-Assigned Namespaces | 🔲 Not Started | 0/? | 0% |
+| **Phase 5: Graph-Assigned Namespaces** | ✅ **Complete** | 35/35 passing | 100% |
 | Phase 6: Integration & Polish | 🔲 Not Started | 0/? | 0% |
 
-**Overall:** 🟢 67% Complete (4/6 phases) - **118 tests passing**
+**Overall:** 🟢 83% Complete (5/6 phases) - **153 tests passing**
 
 ---
 
@@ -331,21 +331,144 @@ Tests:       118 passed, 118 total
 - ✅ Pattern matching is efficient (regex-based)
 - ✅ No additional indexing overhead (uses existing _items Map)
 
-## 🔜 Next Steps (Phase 5)
+## ✅ Phase 5: Graph-Assigned Namespaces (COMPLETED)
 
-**Goal:** Implement Graph-Assigned Namespaces (BackpackNode + Flow classes)
+**Status:** ✅ All 35 tests passing  
+**Completed:** December 18, 2025
+
+### Summary
+
+Phase 5 implemented the BackpackNode and Flow classes, enabling the Graph-Assigned Namespace pattern where nodes define their identity (segment) and flows compose the full namespace path (context).
+
+### Implementation Details
+
+```typescript
+// Define a node with its segment
+class ChatNode extends BackpackNode {
+    static namespaceSegment = "chat";
+    
+    async exec(input: any) {
+        this.pack('message', 'Hello');  // Auto-injects metadata
+        return { done: true };
+    }
+}
+
+// Flow composes namespaces
+const flow = new Flow({ namespace: "sales" });
+const chatNode = flow.addNode(ChatNode, { id: "chat" });
+// → chatNode.namespace = "sales.chat"
+
+// Nested flows
+const subflow = flow.createSubflow({ namespace: "agent" });
+const internalChat = subflow.addNode(ChatNode, { id: "internal" });
+// → internalChat.namespace = "sales.agent.chat"
+```
+
+### Key Features Implemented
+
+1. **BackpackNode Base Class**
+   - Extends PocketFlow's `BaseNode`
+   - `namespaceSegment` static property for identity
+   - Automatic metadata injection in `_run()`
+   - Helper methods: `pack()`, `unpack()`, `unpackRequired()`, `unpackByNamespace()`
+   - Full access to shared Backpack instance
+
+2. **Flow Class (Namespace Composer)**
+   - `addNode()` - Adds nodes with automatic namespace composition
+   - `composeNamespace()` - Algorithm: parent.namespace + node.segment
+   - `createSubflow()` - Creates nested flows with inherited context
+   - `run()` - Orchestrates node execution
+   - `getStats()` - Flow statistics and metrics
+
+3. **Automatic Metadata Injection**
+   - Wraps `backpack.pack()` during `_run()`
+   - Injects: `nodeId`, `nodeName`, `namespace`
+   - Transparent to node developers
+   - Allows manual overrides when needed
+
+4. **Nested Flow Support**
+   - Subflows inherit parent namespace
+   - Shared Backpack instance across all levels
+   - Proper hierarchy: `sales.agent.chat`
+   - Enables complex multi-agent architectures
+
+5. **Helper Methods**
+   - `pack()` - Pack with auto-metadata
+   - `unpack()` - Graceful retrieval
+   - `unpackRequired()` - Fail-fast retrieval
+   - `unpackByNamespace()` - Query by pattern
+
+### Files Created
+
+- `src/nodes/backpack-node.ts` (NEW)
+  - BackpackNode class (207 lines)
+  - NodeConfig and NodeContext interfaces
+  - Helper methods for Backpack integration
+
+- `src/flows/flow.ts` (NEW)
+  - Flow class (279 lines)
+  - FlowConfig interface
+  - Namespace composition algorithm
+  - Nested flow support
+  - Flow execution engine
+
+- `src/flows/index.ts` (NEW)
+  - Module exports
+
+- `tests/flows/backpack-flow-phase5.test.ts` (NEW)
+  - 35 comprehensive tests
+  - BackpackNode instantiation (4 tests)
+  - Namespace composition (6 tests)
+  - Node management (4 tests)
+  - Metadata injection (3 tests)
+  - Helper methods (5 tests)
+  - Nested flows (4 tests)
+  - Flow execution (4 tests)
+  - Flow statistics (2 tests)
+  - Integration scenarios (2 tests)
+  - Access control (1 test)
+
+### Files Modified
+
+- `src/nodes/index.ts` - Added BackpackNode exports
+- `src/index.ts` - Added BackpackFlow export (aliased to avoid conflict with PocketFlow's Flow)
+
+### Test Results
+
+```bash
+Test Suites: 5 passed, 5 total
+Tests:       153 passed, 153 total
+  - Phase 1: 30 tests ✅
+  - Phase 2: 29 tests ✅
+  - Phase 3: 26 tests ✅
+  - Phase 4: 33 tests ✅
+  - Phase 5: 35 tests ✅
+```
+
+### Design Pattern Validation
+
+✅ **Graph-Assigned Namespaces** - Nodes define segments, Flow composes paths  
+✅ **Shared Context** - Single Backpack instance across all nodes  
+✅ **Nested Flows** - Subflows inherit parent namespace and context  
+✅ **Automatic Tracing** - All pack() calls include full metadata  
+✅ **Node Reusability** - Same node class, different contexts  
+
+## 🔜 Next Steps (Phase 6)
+
+**Goal:** Integration, polish, and final testing
 
 ### Planned Tasks
 
-- [ ] Create `BackpackNode` base class extending `BaseNode`
-- [ ] Add `namespaceSegment` static property pattern
-- [ ] Implement `Flow` class with namespace composition
-- [ ] Add `composeNamespace()` algorithm
-- [ ] Support for nested flows/subgraphs
-- [ ] Create Phase 5 tests
+- [ ] EventStreamer integration hooks
+- [ ] Serialization polish (toJSON/fromJSON with namespaces)
+- [ ] Performance optimization
+- [ ] End-to-end integration tests
+- [ ] Real multi-agent scenario tests
+- [ ] Documentation and examples
+- [ ] Final code review
 
-**Estimated Time:** 1-2 days  
-**Estimated Tests:** 20-25 tests
+**Estimated Time:** 1 day  
+**Estimated Tests:** 10-15 integration tests
 
 ---
 
@@ -353,11 +476,11 @@ Tests:       118 passed, 118 total
 
 ### Lines of Code
 
-| Category | Lines | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
-|----------|-------|---------|---------|---------|---------|
-| Implementation | ~1,060 | 613 | +200 | +137 | +110 |
-| Tests | ~1,960 | 501 | +466 | +450 | +543 |
-| **Total** | **~3,020** | **1,114** | **+666** | **+587** | **+653** |
+| Category | Lines | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 |
+|----------|-------|---------|---------|---------|---------|---------|
+| Implementation | ~1,550 | 613 | +200 | +137 | +110 | +490 |
+| Tests | ~2,560 | 501 | +466 | +450 | +543 | +600 |
+| **Total** | **~4,110** | **1,114** | **+666** | **+587** | **+653** | **+1,090** |
 
 ### Test Coverage
 
@@ -365,8 +488,9 @@ Tests:       118 passed, 118 total
 - **Phase 2:** 29 tests - History & time-travel ✅
 - **Phase 3:** 26 tests - Access control ✅
 - **Phase 4:** 33 tests - Namespace query API ✅
-- **Total:** 118 tests passing
-- **Target for v2.0:** 150+ tests across all phases
+- **Phase 5:** 35 tests - Graph-Assigned Namespaces ✅
+- **Total:** 153 tests passing
+- **Target for v2.0:** 165+ tests (including Phase 6)
 
 ---
 
@@ -396,9 +520,9 @@ Tests:       118 passed, 118 total
 
 ### Aggressive Timeline
 
-- **Day 1 (Dec 18):** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4 ✅
-- **Day 2 (Dec 19):** Phase 5 + Phase 6 (start)
-- **Day 3 (Dec 20):** Phase 6 (Integration, Testing, Docs)
+- **Day 1 (Dec 18):** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4 ✅ + Phase 5 ✅
+- **Day 2 (Dec 19):** Phase 6 (Integration, Testing, Docs)
+- **Day 3 (Dec 20):** Final polish & QA
 - **Dec 21:** 🎉 **Release v2.0.0**
 
 ---
