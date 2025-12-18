@@ -33,6 +33,33 @@ export {
     hasCapability
 } from './storage/capabilities';
 
+// v2.0: Backpack storage system (Git-like state management)
+export {
+    Backpack,
+    BackpackError,
+    AccessDeniedError,
+    KeyNotFoundError,
+    ValidationError,
+    InvalidCommitError
+} from './storage';
+
+// v2.0: Backpack types
+export type {
+    BackpackItem,
+    BackpackItemMetadata,
+    BackpackCommit,
+    BackpackOptions,
+    PackOptions,
+    NodePermissions,
+    BackpackSnapshot,
+    BackpackDiff,
+    ValidationResult,
+    NodeContext,
+    NodeConfig,
+    FlowConfig,
+    FlowEdge
+} from './storage';
+
 // Utilities (terminal interface, streaming chatbot, etc.)
 export * from './utils';
 
