@@ -675,6 +675,117 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         this._permissions.delete(nodeId);
     }
     
+    // ===== NAMESPACE QUERY API (Phase 4) =====
+    
+    /**
+     * Get all values from items matching a namespace pattern
+     * 
+     * Usage:
+     * ```typescript
+     * const salesData = backpack.unpackByNamespace('sales.*');
+     * // Returns: { key1: value1, key2: value2, ... }
+     * ```
+     * 
+     * @param pattern - Namespace pattern (supports wildcards: 'sales.*', '*.chat')
+     * @param nodeId - Optional node ID for access control
+     * @returns Record of key-value pairs matching the pattern
+     */
+    unpackByNamespace(pattern: string, nodeId?: string): Record<string, any> {
+        const result: Record<string, any> = {};
+        
+        for (const [key, item] of this._items.entries()) {
+            const namespace = item.metadata.sourceNamespace;
+            
+            // Skip items without namespace
+            if (!namespace) {
+                continue;
+            }
+            
+            // Check if namespace matches pattern
+            if (!this.matchesPattern(pattern, namespace)) {
+                continue;
+            }
+            
+            // Check access control if nodeId provided
+            if (nodeId && this.enableAccessControl) {
+                if (!this.checkAccess(nodeId, key, 'read', namespace)) {
+                    continue; // Skip denied items silently
+                }
+            }
+            
+            // Add to result (deep clone to prevent mutation)
+            result[key] = this.deepClone(item.value);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Get all items (with metadata) matching a namespace pattern
+     * 
+     * Usage:
+     * ```typescript
+     * const salesItems = backpack.getItemsByNamespace('sales.*');
+     * // Returns: [{ key, value, metadata }, ...]
+     * ```
+     * 
+     * @param pattern - Namespace pattern (supports wildcards: 'sales.*', '*.chat')
+     * @param nodeId - Optional node ID for access control
+     * @returns Array of BackpackItems matching the pattern
+     */
+    getItemsByNamespace(pattern: string, nodeId?: string): BackpackItem[] {
+        const items: BackpackItem[] = [];
+        
+        for (const [key, item] of this._items.entries()) {
+            const namespace = item.metadata.sourceNamespace;
+            
+            // Skip items without namespace
+            if (!namespace) {
+                continue;
+            }
+            
+            // Check if namespace matches pattern
+            if (!this.matchesPattern(pattern, namespace)) {
+                continue;
+            }
+            
+            // Check access control if nodeId provided
+            if (nodeId && this.enableAccessControl) {
+                if (!this.checkAccess(nodeId, key, 'read', namespace)) {
+                    continue; // Skip denied items silently
+                }
+            }
+            
+            // Add to result (deep clone to prevent mutation)
+            items.push({
+                key: item.key,
+                value: this.deepClone(item.value),
+                metadata: { ...item.metadata }
+            });
+        }
+        
+        return items;
+    }
+    
+    /**
+     * Get all unique namespaces currently in the Backpack
+     * 
+     * Useful for debugging and discovery
+     * 
+     * @returns Array of unique namespace strings
+     */
+    getNamespaces(): string[] {
+        const namespaces = new Set<string>();
+        
+        for (const item of this._items.values()) {
+            if (item.metadata.sourceNamespace) {
+                namespaces.add(item.metadata.sourceNamespace);
+            }
+        }
+        
+        return Array.from(namespaces).sort();
+    }
+    
     // ===== SERIALIZATION (Future - Stubs for now) =====
     
     /**

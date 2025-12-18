@@ -11,12 +11,12 @@
 |-------|--------|-------|----------|
 | **Phase 1: Core Storage** | ✅ **Complete** | 30/30 passing | 100% |
 | **Phase 2: History & Time-Travel** | ✅ **Complete** | 29/29 passing | 100% |
-| Phase 3: Access Control | 🔲 Not Started | 0/? | 0% |
-| Phase 4: Namespace API | 🔲 Not Started | 0/? | 0% |
+| **Phase 3: Access Control** | ✅ **Complete** | 26/26 passing | 100% |
+| **Phase 4: Namespace Query API** | ✅ **Complete** | 33/33 passing | 100% |
 | Phase 5: Graph-Assigned Namespaces | 🔲 Not Started | 0/? | 0% |
 | Phase 6: Integration & Polish | 🔲 Not Started | 0/? | 0% |
 
-**Overall:** 🟢 33% Complete (2/6 phases)
+**Overall:** 🟢 67% Complete (4/6 phases) - **118 tests passing**
 
 ---
 
@@ -240,20 +240,112 @@ Tests:       85 passed, 85 total
   - Phase 3: 26 tests ✅
 ```
 
-## 🔜 Next Steps (Phase 4)
+## ✅ Phase 4: Namespace Query API (COMPLETED)
 
-**Goal:** Implement namespace query API for filtering and searching
+**Status:** ✅ All 33 tests passing  
+**Completed:** December 18, 2025
+
+### Summary
+
+Phase 4 implemented a powerful namespace query API that allows filtering and retrieving items by namespace patterns, with deep integration into access control and immutability guarantees.
+
+### Implementation Details
+
+```typescript
+// Get all values matching a namespace pattern
+const salesData = backpack.unpackByNamespace('sales.*');
+// Returns: { key1: value1, key2: value2, ... }
+
+// Get full items with metadata
+const salesItems = backpack.getItemsByNamespace('sales.*');
+// Returns: [{ key, value, metadata }, ...]
+
+// Get all unique namespaces
+const namespaces = backpack.getNamespaces();
+// Returns: ['sales.chat', 'sales.search', 'reporting.analytics']
+```
+
+### Key Features Implemented
+
+1. **unpackByNamespace(pattern, nodeId?)**
+   - Returns Record<string, any> of values matching pattern
+   - Supports wildcard patterns: `sales.*`, `*.chat`, `*.v1.*`
+   - Deep clones values to prevent mutation
+   - Integrates with access control when nodeId provided
+
+2. **getItemsByNamespace(pattern, nodeId?)**
+   - Returns BackpackItem[] with full metadata
+   - Enables filtering by namespace + other criteria
+   - Deep clones to maintain immutability
+   - Respects access control permissions
+
+3. **getNamespaces()**
+   - Returns sorted array of all unique namespaces
+   - Useful for discovery and debugging
+   - Excludes items without namespaces
+
+4. **Pattern Matching**
+   - Leverages existing `matchesPattern()` from Phase 3
+   - Single-level wildcards: `sales.*` matches `sales.chat`
+   - Multi-wildcard support: `*.v1.*` matches `app.v1.chat`
+   - Position-independent: `*.chat` works anywhere
+
+5. **Access Control Integration**
+   - Optional nodeId parameter for permission checking
+   - Silently filters denied items (no errors)
+   - Bypass available by omitting nodeId
+
+### Files Modified
+
+- `src/storage/backpack.ts`
+  - Added `unpackByNamespace()` method
+  - Added `getItemsByNamespace()` method
+  - Added `getNamespaces()` method
+  - All methods use `matchesPattern()` from Phase 3
+  - Deep cloning ensures immutability
+
+- `tests/storage/backpack-phase4.test.ts` (NEW)
+  - 33 comprehensive tests covering all query scenarios
+  - unpackByNamespace() (8 tests)
+  - getItemsByNamespace() (6 tests)
+  - getNamespaces() (5 tests)
+  - Access control integration (4 tests)
+  - Complex pattern matching (3 tests)
+  - Performance and edge cases (4 tests)
+  - Integration with other features (3 tests)
+
+### Test Results
+
+```bash
+Test Suites: 4 passed, 4 total
+Tests:       118 passed, 118 total
+  - Phase 1: 30 tests ✅
+  - Phase 2: 29 tests ✅
+  - Phase 3: 26 tests ✅
+  - Phase 4: 33 tests ✅
+```
+
+### Performance
+
+- ✅ `unpackByNamespace()` < 5ms for 1000 items (target: < 5ms)
+- ✅ Pattern matching is efficient (regex-based)
+- ✅ No additional indexing overhead (uses existing _items Map)
+
+## 🔜 Next Steps (Phase 5)
+
+**Goal:** Implement Graph-Assigned Namespaces (BackpackNode + Flow classes)
 
 ### Planned Tasks
 
-- [ ] Build namespace index for efficient queries
-- [ ] Implement `unpackByNamespace()` method
-- [ ] Implement `getItemsByNamespace()` method
-- [ ] Add pattern matching for queries
-- [ ] Create Phase 4 tests
+- [ ] Create `BackpackNode` base class extending `BaseNode`
+- [ ] Add `namespaceSegment` static property pattern
+- [ ] Implement `Flow` class with namespace composition
+- [ ] Add `composeNamespace()` algorithm
+- [ ] Support for nested flows/subgraphs
+- [ ] Create Phase 5 tests
 
-**Estimated Time:** 1 day  
-**Estimated Tests:** 15-20 tests
+**Estimated Time:** 1-2 days  
+**Estimated Tests:** 20-25 tests
 
 ---
 
@@ -261,19 +353,20 @@ Tests:       85 passed, 85 total
 
 ### Lines of Code
 
-| Category | Lines | Phase 1 | Phase 2 | Phase 3 |
-|----------|-------|---------|---------|---------|
-| Implementation | ~950 | 613 | +200 | +137 |
-| Tests | ~1,417 | 501 | +466 | +450 |
-| **Total** | **~2,367** | **1,114** | **+666** | **+587** |
+| Category | Lines | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
+|----------|-------|---------|---------|---------|---------|
+| Implementation | ~1,060 | 613 | +200 | +137 | +110 |
+| Tests | ~1,960 | 501 | +466 | +450 | +543 |
+| **Total** | **~3,020** | **1,114** | **+666** | **+587** | **+653** |
 
 ### Test Coverage
 
 - **Phase 1:** 30 tests - Core storage ✅
 - **Phase 2:** 29 tests - History & time-travel ✅
 - **Phase 3:** 26 tests - Access control ✅
-- **Total:** 85 tests passing
-- **Target for v2.0:** 120+ tests across all phases
+- **Phase 4:** 33 tests - Namespace query API ✅
+- **Total:** 118 tests passing
+- **Target for v2.0:** 150+ tests across all phases
 
 ---
 
@@ -303,8 +396,8 @@ Tests:       85 passed, 85 total
 
 ### Aggressive Timeline
 
-- **Day 1 (Dec 18):** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅
-- **Day 2 (Dec 19):** Phase 4 + Phase 5
+- **Day 1 (Dec 18):** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4 ✅
+- **Day 2 (Dec 19):** Phase 5 + Phase 6 (start)
 - **Day 3 (Dec 20):** Phase 6 (Integration, Testing, Docs)
 - **Dec 21:** 🎉 **Release v2.0.0**
 
