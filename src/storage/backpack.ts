@@ -18,12 +18,14 @@ import {
     BackpackOptions,
     PackOptions,
     NodePermissions,
-    BackpackSnapshot
+    BackpackSnapshot,
+    BackpackDiff
 } from './types';
 import {
     BackpackError,
     AccessDeniedError,
-    KeyNotFoundError
+    KeyNotFoundError,
+    InvalidCommitError
 } from './errors';
 
 /**
@@ -101,15 +103,15 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
             metadata
         };
         
-        // Store previous value for history (Phase 2)
+        // Store previous value for history
         const previousValue = this._items.get(key)?.value;
         
         // Update storage
         this._items.set(key, item);
         this._versions.set(key, version);
         
-        // TODO Phase 2: Record commit to history
-        // this.recordCommit('pack', key, item, previousValue);
+        // Phase 2: Record commit to history
+        this.recordCommit('pack', key, item, previousValue);
     }
     
     /**
@@ -230,17 +232,278 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         this._versions.clear();
     }
     
-    // ===== HISTORY API (Phase 2 - Stubs for now) =====
+    // ===== HISTORY API (Phase 2) =====
+    
+    /**
+     * Record a commit to history (private helper)
+     * 
+     * @param action - Type of action (pack, unpack, quarantine)
+     * @param key - Key affected
+     * @param item - Current BackpackItem (for pack operations)
+     * @param previousValue - Previous value (for pack updates)
+     */
+    private recordCommit(
+        action: 'pack' | 'unpack' | 'quarantine',
+        key: string,
+        item: BackpackItem,
+        previousValue?: any
+    ): void {
+        const commit: BackpackCommit = {
+            commitId: uuidv4(),
+            timestamp: Date.now(),
+            nodeId: item.metadata.sourceNodeId,
+            nodeName: item.metadata.sourceNodeName,
+            namespace: item.metadata.sourceNamespace,
+            action,
+            key,
+            // Deep clone values to prevent mutation affecting history
+            newValue: this.deepClone(item.value),
+            previousValue: previousValue !== undefined ? this.deepClone(previousValue) : undefined,
+            valueSummary: this.summarizeValue(item.value)
+        };
+        
+        // Add to history
+        this._history.push(commit);
+        
+        // Enforce circular buffer (maxHistorySize)
+        if (this._history.length > this.maxHistorySize) {
+            this._history.shift(); // Remove oldest
+        }
+    }
+    
+    /**
+     * Deep clone a value (for history immutability)
+     * 
+     * @param value - Value to clone
+     * @returns Deep cloned value
+     */
+    private deepClone(value: any): any {
+        if (value === null || value === undefined) {
+            return value;
+        }
+        
+        // Use JSON serialization for simple deep cloning
+        // Note: This won't handle functions, symbols, or circular references
+        // but those shouldn't be in Backpack data anyway
+        try {
+            return JSON.parse(JSON.stringify(value));
+        } catch (error) {
+            // If serialization fails, return the value as-is
+            // (better than throwing - allows non-serializable values)
+            console.warn('Backpack: Could not deep clone value, storing reference');
+            return value;
+        }
+    }
+    
+    /**
+     * Create a human-readable summary of a value
+     * 
+     * @param value - Value to summarize
+     * @returns String summary
+     */
+    private summarizeValue(value: any): string {
+        if (value === undefined) return 'undefined';
+        if (value === null) return 'null';
+        
+        const type = typeof value;
+        
+        if (type === 'string') {
+            return value.length > 50 
+                ? `"${value.substring(0, 50)}..."` 
+                : `"${value}"`;
+        }
+        
+        if (type === 'number' || type === 'boolean') {
+            return String(value);
+        }
+        
+        if (Array.isArray(value)) {
+            return `Array(${value.length})`;
+        }
+        
+        if (type === 'object') {
+            const keys = Object.keys(value);
+            return `{ ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', ...' : ''} }`;
+        }
+        
+        return String(value);
+    }
     
     /**
      * Get the full commit history (like "git log")
      * 
-     * Phase 2: Will return all commits
-     * 
      * @returns Array of commits (newest first)
      */
     getHistory(): BackpackCommit[] {
-        return [...this._history];
+        return [...this._history].reverse(); // Newest first
+    }
+    
+    /**
+     * Get commits for a specific key
+     * 
+     * @param key - Key to get history for
+     * @returns Array of commits for this key
+     */
+    getKeyHistory(key: string): BackpackCommit[] {
+        return this._history
+            .filter(commit => commit.key === key)
+            .reverse(); // Newest first
+    }
+    
+    /**
+     * Get a snapshot at a specific commit (like "git checkout <commit>")
+     * 
+     * @param commitId - Commit ID to reconstruct state from
+     * @returns New Backpack instance with state at that commit
+     * @throws InvalidCommitError if commit ID not found
+     */
+    getSnapshotAtCommit(commitId: string): Backpack<T> {
+        // Find the commit index
+        const commitIndex = this._history.findIndex(c => c.commitId === commitId);
+        
+        if (commitIndex === -1) {
+            throw new InvalidCommitError(commitId);
+        }
+        
+        // Create new Backpack and replay commits up to this point
+        const snapshot = new Backpack<T>(undefined, {
+            maxHistorySize: this.maxHistorySize,
+            strictMode: this.strictMode,
+            enableAccessControl: false // Don't enforce access control on snapshots
+        });
+        
+        // Replay all commits up to and including the target commit
+        for (let i = 0; i <= commitIndex; i++) {
+            const commit = this._history[i];
+            
+            if (commit.action === 'pack') {
+                // Reconstruct the item at this point in time
+                snapshot._items.set(commit.key, {
+                    key: commit.key,
+                    value: commit.newValue,
+                    metadata: {
+                        sourceNodeId: commit.nodeId,
+                        sourceNodeName: commit.nodeName,
+                        sourceNamespace: commit.namespace,
+                        timestamp: commit.timestamp,
+                        version: snapshot.getVersion(commit.key) + 1,
+                        tags: []
+                    }
+                });
+                
+                snapshot._versions.set(commit.key, snapshot.getVersion(commit.key) + 1);
+            }
+        }
+        
+        return snapshot;
+    }
+    
+    /**
+     * Get a snapshot before a specific node ran
+     * 
+     * @param nodeId - Node ID to get state before
+     * @returns Backpack snapshot, or undefined if node not found in history
+     */
+    getSnapshotBeforeNode(nodeId: string): Backpack<T> | undefined {
+        // Find first commit by this node
+        const commitIndex = this._history.findIndex(c => c.nodeId === nodeId);
+        
+        if (commitIndex === -1) {
+            return undefined;
+        }
+        
+        // If this is the first commit, return empty backpack
+        if (commitIndex === 0) {
+            return new Backpack<T>(undefined, {
+                maxHistorySize: this.maxHistorySize,
+                strictMode: this.strictMode,
+                enableAccessControl: false
+            });
+        }
+        
+        // Otherwise, get snapshot at the previous commit
+        const previousCommit = this._history[commitIndex - 1];
+        return this.getSnapshotAtCommit(previousCommit.commitId);
+    }
+    
+    /**
+     * Compare two Backpack snapshots (like "git diff")
+     * 
+     * @param before - Earlier snapshot
+     * @param after - Later snapshot
+     * @returns Diff showing changes
+     */
+    static diff<T extends BaseStorage = BaseStorage>(
+        before: Backpack<T>,
+        after: Backpack<T>
+    ): BackpackDiff {
+        const beforeKeys = new Set(before.keys());
+        const afterKeys = new Set(after.keys());
+        
+        const added: string[] = [];
+        const removed: string[] = [];
+        const modified: Array<{ key: string; oldValue: any; newValue: any }> = [];
+        
+        // Find added keys
+        for (const key of afterKeys) {
+            if (!beforeKeys.has(key)) {
+                added.push(key);
+            }
+        }
+        
+        // Find removed keys
+        for (const key of beforeKeys) {
+            if (!afterKeys.has(key)) {
+                removed.push(key);
+            }
+        }
+        
+        // Find modified keys
+        for (const key of beforeKeys) {
+            if (afterKeys.has(key)) {
+                const oldValue = before.peek(key);
+                const newValue = after.peek(key);
+                
+                // Simple comparison (could be enhanced with deep equality)
+                if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+                    modified.push({ key, oldValue, newValue });
+                }
+            }
+        }
+        
+        return { added, removed, modified };
+    }
+    
+    /**
+     * Replay all commits from a specific commit onwards
+     * 
+     * Creates a new Backpack with state at the commit, then replays subsequent commits.
+     * Useful for debugging/simulation.
+     * 
+     * @param commitId - Commit to start from
+     * @returns New Backpack with replayed state
+     */
+    replayFromCommit(commitId: string): Backpack<T> {
+        // Get snapshot at this commit
+        const snapshot = this.getSnapshotAtCommit(commitId);
+        
+        // Find commit index
+        const commitIndex = this._history.findIndex(c => c.commitId === commitId);
+        
+        // Replay subsequent commits
+        for (let i = commitIndex + 1; i < this._history.length; i++) {
+            const commit = this._history[i];
+            
+            if (commit.action === 'pack') {
+                snapshot.pack(commit.key, commit.newValue, {
+                    nodeId: commit.nodeId,
+                    nodeName: commit.nodeName,
+                    namespace: commit.namespace
+                });
+            }
+        }
+        
+        return snapshot;
     }
     
     // ===== ACCESS CONTROL API (Phase 3 - Stubs for now) =====
