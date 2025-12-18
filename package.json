@@ -1,6 +1,6 @@
 {
   "name": "backpackflow",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "A config-driven LLM framework built on top of PocketFlow",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

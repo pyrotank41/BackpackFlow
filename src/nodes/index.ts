@@ -1,26 +1,27 @@
-export * from './llm';
+// BackpackFlow v2.0 - Core Exports
 
-// Export individual node types for convenience
-export { ChatNode } from './llm/chat-node';
+// BackpackNode base class (v2.0)
+export { BackpackNode, NodeConfig, NodeContext } from './backpack-node';
 
-// Export tool workflow nodes
-export { DecisionNode } from './decision-node';
-export { FinalAnswerNode } from './final-answer-node';
-export { ToolParamGenerationNode } from './tool-param-generation-node';
-export { ToolExecutionNode } from './tool-execution-node';
+// Serializable nodes (v2.0)
+export * from './serializable';
 
-// Export high-level agent node
-export { AgentNode } from './agent-node';
+// Event streaming (v2.0)
+export { EventStreamer } from '../events/event-streamer';
+export { StreamEventType } from '../events/types';
 
-// Export base classes and types
-export * from './base-llm-node';
+// Node types
 export * from './types';
 
-// Export MCP core functionality
+// MCP core functionality
 export * from './mcp-core';
 
-// Export event streaming
-export { EventStreamer, StreamEventType } from '../events/event-streamer';
-
-// BackpackFlow v2.0
-export { BackpackNode, NodeConfig, NodeContext } from './backpack-node';
+// Legacy v1.x exports (commented out - not compatible with v2.0)
+// export * from './llm';
+// export { ChatNode } from './llm/chat-node';
+// export { DecisionNode } from './decision-node';
+// export { FinalAnswerNode } from './final-answer-node';
+// export { ToolParamGenerationNode } from './tool-param-generation-node';
+// export { ToolExecutionNode } from './tool-execution-node';
+// export { AgentNode } from './agent-node';
+// export * from './base-llm-node';

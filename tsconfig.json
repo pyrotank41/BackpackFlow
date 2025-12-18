@@ -25,6 +25,15 @@
   "exclude": [
     "node_modules", 
     "dist", 
-    "tests/**/*"
+    "tests/**/*",
+    "src/examples/**/*",
+    "src/nodes/base-llm-node.ts",
+    "src/nodes/decision-node.ts",
+    "src/nodes/final-answer-node.ts",
+    "src/nodes/tool-execution-node.ts",
+    "src/nodes/tool-param-generation-node.ts",
+    "src/nodes/agent-node.ts",
+    "src/nodes/llm/**/*",
+    "src/providers/**/*"
   ]
 } 

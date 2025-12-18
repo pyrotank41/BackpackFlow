@@ -6,8 +6,8 @@ export * from './pocketflow';
 // Production-ready nodes for building AI applications
 export * from './nodes';
 
-// LLM providers and abstractions
-export * from './providers';
+// LLM providers and abstractions (v1.x - commented out for v2.0)
+// export * from './providers';
 
 // Event streaming system
 export * from './events';
@@ -54,17 +54,14 @@ export type {
     BackpackSnapshot,
     BackpackDiff,
     ValidationResult,
-    NodeContext,
-    NodeConfig,
-    FlowConfig,
-    FlowEdge
+    NodeContext
 } from './storage';
 
 // Utilities (terminal interface, streaming chatbot, etc.)
 export * from './utils';
 
-// Examples
-export * from './examples';
+// Examples (v1.x - commented out for v2.0)
+// export * from './examples';
 
 // Simple API for tutorials and quick prototyping
 // export * from './simple'; // TODO: Implement simple API
@@ -73,7 +70,8 @@ export * from './examples';
 export { Node, Flow, BatchNode, ParallelBatchNode, BaseNode } from './pocketflow';
 
 // BackpackFlow v2.0 - Flow with namespace composition
-export { Flow as BackpackFlow, FlowConfig } from './flows/flow';
+export { Flow as BackpackFlow } from './flows/flow';
+export type { FlowConfig } from './flows/flow';
 
 // v2.0: Serialization Bridge (PRD-003)
 export { 
