@@ -21,3 +21,6 @@ export * from './mcp-core';
 
 // Export event streaming
 export { EventStreamer, StreamEventType } from '../events/event-streamer';
+
+// BackpackFlow v2.0
+export { BackpackNode, NodeConfig, NodeContext } from './backpack-node';

@@ -70,4 +70,7 @@ export * from './examples';
 // export * from './simple'; // TODO: Implement simple API
 
 // Re-export core PocketFlow classes for convenience
-export { Node, Flow, BatchNode, ParallelBatchNode, BaseNode } from './pocketflow'; 
+export { Node, Flow, BatchNode, ParallelBatchNode, BaseNode } from './pocketflow';
+
+// BackpackFlow v2.0 - Flow with namespace composition
+export { Flow as BackpackFlow, FlowConfig } from './flows/flow'; 
