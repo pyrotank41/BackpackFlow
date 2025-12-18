@@ -32,7 +32,8 @@
     "start": "ts-node",
     "test": "jest",
     "test:watch": "jest --watch",
-    "example": "ts-node tutorials/storage-demo.ts"
+    "example": "ts-node tutorials/storage-demo.ts",
+    "tutorial:research-agent": "ts-node tutorials/v2.0-research-agent.ts"
   },
   "keywords": [
     "llm",
