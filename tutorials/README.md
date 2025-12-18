@@ -6,11 +6,15 @@ Welcome to the BackpackFlow v2.0 tutorials! These examples demonstrate the new f
 
 ### Research Agent Tutorial
 
-A complete example showcasing all v2.0 features:
+A complete example showcasing all v2.0 features through a **nested agent architecture**:
+- **ResearchAgentNode** - High-level agent with internal workflow
+- **Nested Flow Pattern** - Agent containing ChatNode, ResearchNode, SynthesisNode
+- **Namespace Inheritance** - Internal flow inherits parent namespace
 - **BackpackNode** with automatic metadata injection
 - **Flow** with namespace composition  
 - **Backpack** for state management with history
-- Multi-node workflows with proper tracing
+- **Access Control** between nodes with permissions
+- **Namespace Queries** for filtering data by patterns
 - Time-travel debugging capabilities
 
 **Run it:**
@@ -35,11 +39,13 @@ npx ts-node tutorials/v2.0-research-agent.ts "your query here"
 - ⏰ Time-travel snapshot demo
 
 **Output includes:**
-- Namespace composition: `research-agent.chat`, `research-agent.research`, etc.
+- **Nested architecture**: `main.agent` → `main.agent.chat`, `main.agent.research`, etc.
+- **8 feature demonstrations**: Namespace hierarchy, queries, history, metadata, access control, time-travel, output, statistics
 - Automatic metadata: nodeId, nodeName, namespace in every pack()
-- Full execution history with ~10 commits
+- Full execution history with complete audit trail
+- Access control permissions matrix
 - Flow statistics and Backpack contents
-- Serialization snapshot for time-travel
+- Serialization snapshot for time-travel debugging
 
 ## 📚 Legacy Tutorials (v1.x)
 
@@ -86,9 +92,18 @@ class ChatNode extends BackpackNode {
 
 ### Flow (Namespace Composer)
 ```typescript
-const flow = new Flow({ namespace: 'research-agent' });
-const chat = flow.addNode(ChatNode, { id: 'chat' });
-// → chat.namespace = "research-agent.chat"
+// Main flow
+const mainFlow = new Flow({ namespace: 'main' });
+const agent = mainFlow.addNode(ResearchAgentNode, { id: 'agent' });
+// → agent.namespace = "main.agent"
+
+// Inside ResearchAgentNode.exec() - nested flow
+const internalFlow = new Flow({
+    namespace: this.namespace,  // "main.agent"
+    backpack: this.backpack
+});
+const chat = internalFlow.addNode(ChatNode, { id: 'chat' });
+// → chat.namespace = "main.agent.chat"  ✅ Hierarchical!
 ```
 
 ### Backpack (State + History)
