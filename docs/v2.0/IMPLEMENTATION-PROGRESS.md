@@ -10,13 +10,13 @@
 | Phase | Status | Tests | Progress |
 |-------|--------|-------|----------|
 | **Phase 1: Core Storage** | ✅ **Complete** | 30/30 passing | 100% |
-| Phase 2: History & Time-Travel | 🔲 Not Started | 0/? | 0% |
+| **Phase 2: History & Time-Travel** | ✅ **Complete** | 29/29 passing | 100% |
 | Phase 3: Access Control | 🔲 Not Started | 0/? | 0% |
 | Phase 4: Namespace API | 🔲 Not Started | 0/? | 0% |
 | Phase 5: Graph-Assigned Namespaces | 🔲 Not Started | 0/? | 0% |
 | Phase 6: Integration & Polish | 🔲 Not Started | 0/? | 0% |
 
-**Overall:** 🟢 16% Complete (1/6 phases)
+**Overall:** 🟢 33% Complete (2/6 phases)
 
 ---
 
@@ -94,25 +94,77 @@ Time:        1.866 s
 
 ---
 
-## 🔜 Next Steps (Phase 2)
+## ✅ Phase 2: History & Time-Travel (COMPLETE)
 
-**Goal:** Implement history tracking and time-travel debugging
+**Duration:** ~3 hours  
+**Status:** ✅ All tests passing  
+**Test Coverage:** 29 tests
+
+### Completed Tasks
+
+- [x] Implemented history tracking with `recordCommit()` 
+- [x] Deep cloning for immutability
+- [x] Implemented `getHistory()` with circular buffer
+- [x] Implemented `getKeyHistory()` for per-key history
+- [x] Implemented `getSnapshotAtCommit(commitId)` 
+- [x] Implemented `getSnapshotBeforeNode(nodeId)`
+- [x] Implemented `Backpack.diff()` static method
+- [x] Implemented `replayFromCommit(commitId)`
+- [x] Implemented value summarization for display
+- [x] Created comprehensive Phase 2 tests (29 tests)
+- [x] All 59 tests passing (Phase 1 + Phase 2) ✅
+
+### Files Updated
+
+```
+src/storage/
+└── backpack.ts              # +200 lines (history & time-travel)
+
+tests/storage/
+└── backpack-phase2.test.ts  # 29 new tests (466 lines)
+```
+
+### Test Results
+
+```
+Test Suites: 2 passed, 2 total
+Tests:       59 passed, 59 total (30 Phase 1 + 29 Phase 2)
+Time:        1.841 s
+```
+
+### Key Features Implemented
+
+1. **History Tracking**
+   - Automatic commit recording on every `pack()`
+   - Full values stored (not just summaries)
+   - Previous values tracked for diffs
+   - Circular buffer with configurable size
+
+2. **Time-Travel Debugging**
+   - `getSnapshotAtCommit()` - Reconstruct any past state
+   - `getSnapshotBeforeNode()` - See state before a node ran
+   - `diff()` - Compare two snapshots
+   - `replayFromCommit()` - Replay execution from a point
+
+3. **Immutability**
+   - Deep cloning prevents mutation of history
+   - Snapshots are independent Backpack instances
+
+## 🔜 Next Steps (Phase 3)
+
+**Goal:** Implement access control and permissions
 
 ### Planned Tasks
 
-- [ ] Implement `BackpackCommit` structure
-- [ ] Add `recordCommit()` private method
-- [ ] Implement `getHistory()` with circular buffer
-- [ ] Implement `getSnapshotAtCommit(commitId)`
-- [ ] Implement `getSnapshotBeforeNode(nodeId)`
-- [ ] Implement `diff(snapshot1, snapshot2)`
-- [ ] Implement `replayFromCommit(commitId)`
-- [ ] Create Phase 2 tests
-- [ ] Test circular buffer (maxHistorySize)
-- [ ] Test snapshot reconstruction
+- [ ] Implement `checkAccess()` method
+- [ ] Add key-based permissions
+- [ ] Add namespace-based permissions
+- [ ] Implement wildcard pattern matching
+- [ ] Create Phase 3 tests
+- [ ] Test access denial scenarios
 
 **Estimated Time:** 1-2 days  
-**Estimated Tests:** 15-20 tests
+**Estimated Tests:** 20-25 tests
 
 ---
 
@@ -120,15 +172,17 @@ Time:        1.866 s
 
 ### Lines of Code
 
-| Category | Lines |
-|----------|-------|
-| Implementation | ~613 |
-| Tests | ~501 |
-| **Total** | **~1,114** |
+| Category | Lines | Phase 1 | Phase 2 |
+|----------|-------|---------|---------|
+| Implementation | ~813 | 613 | +200 |
+| Tests | ~967 | 501 | +466 |
+| **Total** | **~1,780** | **1,114** | **+666** |
 
 ### Test Coverage
 
-- **Phase 1:** 30 tests covering all core storage functionality
+- **Phase 1:** 30 tests - Core storage ✅
+- **Phase 2:** 29 tests - History & time-travel ✅
+- **Total:** 59 tests passing
 - **Target for v2.0:** 100+ tests across all phases
 
 ---
