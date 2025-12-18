@@ -82,6 +82,8 @@ export interface BackpackOptions {
     maxHistorySize?: number;         // Max commits to keep (default: 10000)
     strictMode?: boolean;            // Throw on access violations vs. log warning
     enableAccessControl?: boolean;   // Enable/disable access control (default: true)
+    eventStreamer?: any;             // Optional EventStreamer for telemetry (v2.0)
+    runId?: string;                  // Optional run ID for event correlation
 }
 
 /**

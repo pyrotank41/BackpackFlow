@@ -33,7 +33,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "example": "ts-node tutorials/storage-demo.ts",
-    "tutorial:research-agent": "ts-node tutorials/v2.0-research-agent.ts"
+    "tutorial:research-agent": "ts-node tutorials/v2.0-research-agent.ts",
+    "demo:observable-agent": "ts-node tutorials/v2.0-observable-agent.ts"
   },
   "keywords": [
     "llm",

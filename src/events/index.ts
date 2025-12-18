@@ -1,8 +1,8 @@
 /**
- * Event Streaming System for BackpackFlow
+ * BackpackFlow v2.0 - Events Module
  * 
- * Event-driven streaming with namespace support for real-time feedback.
+ * Exports telemetry system components
  */
 
-// Core event streaming
-export { EventStreamer, StreamEventType, StreamEvent } from './event-streamer';
+export * from './types';
+export * from './event-streamer';

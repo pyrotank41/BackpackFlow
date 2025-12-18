@@ -5,7 +5,34 @@
 
 ---
 
+## 🎯 v2.0 Release Overview
+
+**Three Core PRDs for v2.0:**
+1. ✅ **PRD-001: Backpack Architecture** - Git-like state management
+2. ✅ **PRD-002: Telemetry System** - Standardized event streaming
+3. ⏳ **PRD-003: Serialization Bridge** - Config-driven nodes (In Progress)
+
+---
+
 ## 📊 Overall Progress
+
+| PRD | Feature | Status | Tests | Progress |
+|-----|---------|--------|-------|----------|
+| **PRD-001** | Backpack Architecture | ✅ **Complete** | 175/175 passing | 100% |
+| **PRD-002** | Telemetry System | ✅ **Complete** | 28/28 passing | 100% |
+| **PRD-003** | Serialization Bridge | ⏳ **In Progress** | 0/0 passing | 0% |
+
+**Overall v2.0 Progress:** 🎉 **2/3 PRDs Complete - 203 tests passing**
+
+---
+
+# PRD-001: Backpack Architecture
+
+**Status:** ✅ Complete  
+**Total Tests:** 175 passing  
+**Implementation Time:** ~8 hours
+
+## Phase Breakdown
 
 | Phase | Status | Tests | Progress |
 |-------|--------|-------|----------|
@@ -15,8 +42,6 @@
 | **Phase 4: Namespace Query API** | ✅ **Complete** | 33/33 passing | 100% |
 | **Phase 5: Graph-Assigned Namespaces** | ✅ **Complete** | 35/35 passing | 100% |
 | **Phase 6: Integration & Polish** | ✅ **Complete** | 22/22 passing | 100% |
-
-**Overall:** 🎉 **100% Complete (6/6 phases) - 175 tests passing**
 
 ---
 
@@ -629,9 +654,165 @@ expect(flow.backpack.getItem('chatInput')!.metadata.sourceNamespace)
 
 ---
 
+# PRD-002: Telemetry System
+
+**Status:** ✅ Complete  
+**Total Tests:** 28 passing  
+**Implementation Time:** ~4 hours
+
+## Features Implemented
+
+### ✅ EventStreamer Core
+- Type-safe event emission and subscription
+- Wildcard pattern matching (`*`, `sales.*`)
+- Event history with circular buffer
+- Sync/async emission modes
+- Event filtering (by nodeId, type, runId, namespace)
+
+### ✅ Event Schema
+- `StreamEventType` enum with all event types
+- `BackpackEvent` interface with metadata
+- Strongly-typed payloads for each event
+- Lifecycle events: NODE_START, PREP_COMPLETE, EXEC_COMPLETE, NODE_END, ERROR
+- Backpack events: BACKPACK_PACK, BACKPACK_UNPACK
+- Custom events: STREAM_CHUNK, TOOL_CALL, CUSTOM
+
+### ✅ Integration
+- Backpack emits BACKPACK_PACK/UNPACK automatically
+- BackpackNode emits full lifecycle events
+- Tracks backpack reads/writes during execution
+- Graceful error handling (telemetry never breaks execution)
+
+### ✅ Advanced Features
+- Filter history by multiple criteria
+- Namespace pattern matching (sales.*, *.research.*)
+- Event statistics (totals, unique nodes/namespaces/runs)
+- Helper methods: `getNodeEvents()`, `getNamespaceEvents()`, `onNamespace()`
+- Listener management (on, once, off, removeAllListeners)
+
+## Files Created
+
+```
+src/events/
+├── types.ts              # Event schema (165 lines)
+├── event-streamer.ts     # EventStreamer class (257 lines)
+└── index.ts              # Module exports (7 lines)
+
+tests/events/
+└── event-streamer.test.ts # Comprehensive tests (612 lines)
+```
+
+## Files Modified
+
+- `src/storage/types.ts` - Added `eventStreamer` option to BackpackOptions
+- `src/storage/backpack.ts` - Event emission in pack/unpack methods
+- `src/nodes/backpack-node.ts` - Lifecycle event emission in _run()
+
+## Test Coverage (28/28 passing)
+
+### EventStreamer Core Functionality (18 tests)
+- ✅ Event emission and subscription (4 tests)
+- ✅ Event history (8 tests)
+- ✅ Wildcard namespace matching (3 tests)
+- ✅ Event statistics (1 test)
+- ✅ Sync/async emission (2 tests)
+
+### Backpack Event Emission Integration (4 tests)
+- ✅ BACKPACK_PACK events
+- ✅ BACKPACK_UNPACK events (success)
+- ✅ BACKPACK_UNPACK events (not found)
+- ✅ BACKPACK_UNPACK events (access denied)
+
+### BackpackNode Lifecycle Events (6 tests)
+- ✅ NODE_START event
+- ✅ PREP_COMPLETE event
+- ✅ EXEC_COMPLETE event
+- ✅ NODE_END event
+- ✅ ERROR event on node failure
+- ✅ Complete lifecycle for successful execution
+
+## Key Design Decisions
+
+### AD-001: Synchronous vs Asynchronous Emission
+**Decision:** Synchronous by default, with optional async mode  
+**Rationale:** 
+- In-memory handlers are fast (no latency concern)
+- Synchronous = simpler mental model for debugging
+- Async mode available for network operations (fire-and-forget)
+
+### AD-002: Event History Storage
+**Decision:** Circular buffer with configurable max size (default: 1000)  
+**Rationale:**
+- Prevents memory leaks in long-running agents
+- Keeps most recent events for debugging
+- Can be disabled for high-throughput scenarios
+
+### AD-003: Graceful Telemetry Failures
+**Decision:** Telemetry errors are caught and logged, never thrown  
+**Rationale:**
+- Observability should never break production code
+- Telemetry is opt-in, not required
+- Warning logs help diagnose telemetry issues
+
+### AD-004: Wildcard Pattern Matching
+**Decision:** Glob-style patterns (`*` matches segments, not paths)  
+**Rationale:**
+- `sales.*` matches `sales.chat` but NOT `sales.research.chat`
+- Clear, predictable semantics
+- Matches namespace structure (hierarchical)
+
+## Usage Example
+
+```typescript
+import { EventStreamer, StreamEventType } from './src/events';
+import { Backpack } from './src/storage';
+import { BackpackNode } from './src/nodes';
+
+// Create streamer
+const streamer = new EventStreamer({ maxHistorySize: 1000 });
+
+// Subscribe to events
+streamer.on(StreamEventType.NODE_START, (event) => {
+    console.log(`Node ${event.sourceNode} started`);
+});
+
+// Wildcard subscription
+streamer.on('*', (event) => {
+    console.log(`Event: ${event.type} from ${event.sourceNode}`);
+});
+
+// Namespace pattern
+streamer.onNamespace('sales.*', (event) => {
+    console.log(`Sales event: ${event.type}`);
+});
+
+// Create Backpack with telemetry
+const backpack = new Backpack({}, { 
+    eventStreamer: streamer,
+    runId: 'my-run-123'
+});
+
+// Events are automatically emitted!
+backpack.pack('data', value); // → BACKPACK_PACK event
+backpack.unpack('data');      // → BACKPACK_UNPACK event
+
+// Query history
+const nodeEvents = streamer.getNodeEvents('chat-node');
+const salesEvents = streamer.getNamespaceEvents('sales.*');
+const runEvents = streamer.getRunEvents('my-run-123');
+
+// Get statistics
+const stats = streamer.getStats();
+console.log(`Total events: ${stats.totalEvents}`);
+console.log(`Unique nodes: ${stats.uniqueNodes}`);
+```
+
+---
+
 ## 📚 Documentation References
 
 - **[PRD-001](./prds/PRD-001-backpack-architecture.md)** - Backpack Architecture
+- **[PRD-002](./prds/PRD-002-telemetry-system.md)** - Telemetry System
 - **[TECH-SPEC-001](./specs/TECH-SPEC-001-backpack-implementation.md)** - Implementation Guide
 - **[DECISIONS-AUDIT-v2.0](./specs/DECISIONS-AUDIT-v2.0.md)** - All design decisions
 

@@ -101,21 +101,28 @@ export class BackpackNode<S = any> extends BaseNode<S> {
     }
     
     /**
-     * Override _run to inject Backpack metadata automatically
+     * Override _run to inject Backpack metadata and emit lifecycle events
      * 
      * This ensures all pack() calls include:
      * - nodeId
      * - nodeName
      * - namespace
      * 
-     * Without requiring developers to pass them manually
+     * And emits telemetry events at each lifecycle phase (PRD-002)
      */
     async _run(shared: S): Promise<string | undefined> {
-        // Store original pack method
-        const originalPack = this.backpack.pack.bind(this.backpack);
+        const startTime = Date.now();
+        const backpackReads: string[] = [];
+        const backpackWrites: string[] = [];
         
-        // Create wrapper that injects metadata
+        // Store original methods
+        const originalPack = this.backpack.pack.bind(this.backpack);
+        const originalUnpack = this.backpack.unpack.bind(this.backpack);
+        const originalUnpackRequired = this.backpack.unpackRequired.bind(this.backpack);
+        
+        // Create wrapper for pack() that tracks writes
         const wrappedPack = (key: string, value: any, options?: PackOptions): void => {
+            backpackWrites.push(key);
             return originalPack(key, value, {
                 ...options,
                 nodeId: options?.nodeId || this.id,
@@ -124,18 +131,235 @@ export class BackpackNode<S = any> extends BaseNode<S> {
             });
         };
         
-        // Temporarily replace pack method
+        // Create wrapper for unpack() that tracks reads
+        const wrappedUnpack = <V = any>(key: string, nodeId?: string): V | undefined => {
+            backpackReads.push(key);
+            return originalUnpack<V>(key, nodeId || this.id);
+        };
+        
+        // Create wrapper for unpackRequired() that tracks reads
+        const wrappedUnpackRequired = <V = any>(key: string, nodeId?: string): V => {
+            backpackReads.push(key);
+            return originalUnpackRequired<V>(key, nodeId || this.id);
+        };
+        
+        // Temporarily replace methods
         // @ts-ignore - intentional method replacement
         this.backpack.pack = wrappedPack;
+        // @ts-ignore
+        this.backpack.unpack = wrappedUnpack;
+        // @ts-ignore
+        this.backpack.unpackRequired = wrappedUnpackRequired;
         
         try {
-            // Run the node's lifecycle
-            return await super._run(shared);
+            // PRD-002: Emit NODE_START event
+            this.emitNodeStart(shared);
+            
+            // Run prep phase
+            const prepStartTime = Date.now();
+            const prepResult = await this.prep(shared);
+            
+            // PRD-002: Emit PREP_COMPLETE event
+            this.emitPrepComplete(prepResult, [...backpackReads]); // Copy reads up to this point
+            
+            // Run exec phase
+            const execStartTime = Date.now();
+            const execResult = await this._exec(prepResult);
+            const execDuration = Date.now() - execStartTime;
+            
+            // PRD-002: Emit EXEC_COMPLETE event
+            this.emitExecComplete(execResult, execDuration);
+            
+            // Run post phase
+            const action = await this.post(shared, prepResult, execResult);
+            const totalDuration = Date.now() - startTime;
+            
+            // PRD-002: Emit NODE_END event
+            this.emitNodeEnd(action, backpackWrites, totalDuration);
+            
+            return action;
+            
+        } catch (error) {
+            // PRD-002: Emit ERROR event
+            const phase = this.determineErrorPhase(error);
+            this.emitError(error as Error, phase);
+            throw error;
+            
         } finally {
-            // Restore original pack method
+            // Restore original methods
             // @ts-ignore
             this.backpack.pack = originalPack;
+            // @ts-ignore
+            this.backpack.unpack = originalUnpack;
+            // @ts-ignore
+            this.backpack.unpackRequired = originalUnpackRequired;
         }
+    }
+    
+    // ===== EVENT EMISSION HELPERS (PRD-002) =====
+    
+    /**
+     * Emit NODE_START event
+     */
+    private emitNodeStart(shared: S): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            const { StreamEventType } = require('../events/types');
+            
+            this.eventStreamer.emit(
+                StreamEventType.NODE_START,
+                {
+                    nodeName: this.constructor.name,
+                    nodeId: this.id,
+                    namespace: this.namespace,
+                    params: {}, // Could include node config here
+                    backpackSnapshot: this.getBackpackSnapshot()
+                },
+                {
+                    sourceNode: this.constructor.name,
+                    nodeId: this.id,
+                    namespace: this.namespace,
+                    runId: (this.backpack as any).runId
+                }
+            );
+        } catch (error) {
+            console.warn('Failed to emit NODE_START event:', error);
+        }
+    }
+    
+    /**
+     * Emit PREP_COMPLETE event
+     */
+    private emitPrepComplete(prepResult: unknown, backpackReads: string[]): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            const { StreamEventType } = require('../events/types');
+            
+            this.eventStreamer.emit(
+                StreamEventType.PREP_COMPLETE,
+                {
+                    prepResult,
+                    backpackReads
+                },
+                {
+                    sourceNode: this.constructor.name,
+                    nodeId: this.id,
+                    namespace: this.namespace,
+                    runId: (this.backpack as any).runId
+                }
+            );
+        } catch (error) {
+            console.warn('Failed to emit PREP_COMPLETE event:', error);
+        }
+    }
+    
+    /**
+     * Emit EXEC_COMPLETE event
+     */
+    private emitExecComplete(execResult: unknown, durationMs: number): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            const { StreamEventType } = require('../events/types');
+            
+            this.eventStreamer.emit(
+                StreamEventType.EXEC_COMPLETE,
+                {
+                    execResult,
+                    attempts: 1, // TODO: Track retry attempts
+                    durationMs
+                },
+                {
+                    sourceNode: this.constructor.name,
+                    nodeId: this.id,
+                    namespace: this.namespace,
+                    runId: (this.backpack as any).runId
+                }
+            );
+        } catch (error) {
+            console.warn('Failed to emit EXEC_COMPLETE event:', error);
+        }
+    }
+    
+    /**
+     * Emit NODE_END event
+     */
+    private emitNodeEnd(action: string | undefined, backpackWrites: string[], durationMs: number): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            const { StreamEventType } = require('../events/types');
+            
+            this.eventStreamer.emit(
+                StreamEventType.NODE_END,
+                {
+                    action,
+                    backpackWrites,
+                    durationMs
+                },
+                {
+                    sourceNode: this.constructor.name,
+                    nodeId: this.id,
+                    namespace: this.namespace,
+                    runId: (this.backpack as any).runId
+                }
+            );
+        } catch (error) {
+            console.warn('Failed to emit NODE_END event:', error);
+        }
+    }
+    
+    /**
+     * Emit ERROR event
+     */
+    private emitError(error: Error, phase: 'prep' | 'exec' | 'post'): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            const { StreamEventType } = require('../events/types');
+            
+            this.eventStreamer.emit(
+                StreamEventType.ERROR,
+                {
+                    phase,
+                    error: error.message,
+                    stack: error.stack,
+                    backpackStateAtError: this.getBackpackSnapshot()
+                },
+                {
+                    sourceNode: this.constructor.name,
+                    nodeId: this.id,
+                    namespace: this.namespace,
+                    runId: (this.backpack as any).runId
+                }
+            );
+        } catch (emitError) {
+            console.warn('Failed to emit ERROR event:', emitError);
+        }
+    }
+    
+    /**
+     * Get a snapshot of current Backpack state for events
+     */
+    private getBackpackSnapshot(): Record<string, any> {
+        const snapshot: Record<string, any> = {};
+        for (const key of this.backpack.keys()) {
+            snapshot[key] = this.backpack.peek(key);
+        }
+        return snapshot;
+    }
+    
+    /**
+     * Determine which phase an error occurred in (heuristic)
+     */
+    private determineErrorPhase(error: any): 'prep' | 'exec' | 'post' {
+        // Simple heuristic based on stack trace or error type
+        const stack = error?.stack || '';
+        if (stack.includes('.prep')) return 'prep';
+        if (stack.includes('.post')) return 'post';
+        return 'exec'; // Default to exec
     }
     
     /**

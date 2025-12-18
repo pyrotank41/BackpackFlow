@@ -53,6 +53,10 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
     // ===== Version Tracking =====
     private _versions: Map<string, number> = new Map();  // key -> version number
     
+    // ===== Telemetry (Phase PRD-002) =====
+    private eventStreamer?: any;  // EventStreamer instance (optional)
+    private runId: string;
+    
     /**
      * Create a new Backpack instance
      * 
@@ -63,6 +67,8 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         this.maxHistorySize = options?.maxHistorySize ?? 10000;
         this.strictMode = options?.strictMode ?? false;
         this.enableAccessControl = options?.enableAccessControl ?? true;
+        this.eventStreamer = options?.eventStreamer;
+        this.runId = options?.runId ?? uuidv4();
         
         // If initial data provided, pack it with system identity
         if (initialData) {
@@ -126,6 +132,9 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         
         // Phase 2: Record commit to history
         this.recordCommit('pack', key, item, previousValue);
+        
+        // PRD-002: Emit BACKPACK_PACK event
+        this.emitPackEvent(key, item);
     }
     
     /**
@@ -141,12 +150,17 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         const item = this._items.get(key);
         
         if (!item) {
+            // PRD-002: Emit BACKPACK_UNPACK event (not found)
+            this.emitUnpackEvent(key, nodeId ?? 'unknown', false, 'Key not found');
             return undefined;
         }
         
         // Phase 3: Check access control
         if (nodeId && this.enableAccessControl) {
             if (!this.checkAccess(nodeId, key, 'read')) {
+                // PRD-002: Emit BACKPACK_UNPACK event (access denied)
+                this.emitUnpackEvent(key, nodeId, false, 'Access denied');
+                
                 if (this.strictMode) {
                     throw new AccessDeniedError(nodeId, key, 'read');
                 }
@@ -155,6 +169,9 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
                 return undefined;
             }
         }
+        
+        // PRD-002: Emit BACKPACK_UNPACK event (success)
+        this.emitUnpackEvent(key, nodeId ?? 'unknown', true);
         
         return item.value as V;
     }
@@ -178,14 +195,21 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         // Phase 3: Check access control (even if not found - don't leak existence)
         if (nodeId && this.enableAccessControl && item) {
             if (!this.checkAccess(nodeId, key, 'read')) {
+                // PRD-002: Emit BACKPACK_UNPACK event (access denied)
+                this.emitUnpackEvent(key, nodeId, false, 'Access denied');
                 throw new AccessDeniedError(nodeId, key, 'read');
             }
         }
         
         // Now check existence
         if (!item) {
+            // PRD-002: Emit BACKPACK_UNPACK event (not found)
+            this.emitUnpackEvent(key, nodeId ?? 'unknown', false, 'Key not found');
             throw new KeyNotFoundError(key, nodeId);
         }
+        
+        // PRD-002: Emit BACKPACK_UNPACK event (success)
+        this.emitUnpackEvent(key, nodeId ?? 'unknown', true);
         
         return item.value as V;
     }
@@ -822,6 +846,101 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         }
         
         return backpack;
+    }
+    
+    // ===== EVENT EMISSION (PRD-002: Telemetry) =====
+    
+    /**
+     * Emit BACKPACK_PACK event
+     */
+    private emitPackEvent(key: string, item: BackpackItem): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            // Import StreamEventType dynamically to avoid circular dependencies
+            const { StreamEventType } = require('../events/types');
+            
+            const payload = {
+                key,
+                valueSummary: this.truncateValue(item.value),
+                metadata: {
+                    sourceNodeId: item.metadata.sourceNodeId,
+                    sourceNodeName: item.metadata.sourceNodeName,
+                    sourceNamespace: item.metadata.sourceNamespace,
+                    timestamp: item.metadata.timestamp,
+                    version: item.metadata.version,
+                    tags: item.metadata.tags
+                }
+            };
+            
+            this.eventStreamer.emit(
+                StreamEventType.BACKPACK_PACK,
+                payload,
+                {
+                    sourceNode: item.metadata.sourceNodeName,
+                    nodeId: item.metadata.sourceNodeId,
+                    namespace: item.metadata.sourceNamespace,
+                    runId: this.runId
+                }
+            );
+        } catch (error) {
+            // Silently fail - telemetry should never break execution
+            console.warn('Failed to emit BACKPACK_PACK event:', error);
+        }
+    }
+    
+    /**
+     * Emit BACKPACK_UNPACK event
+     */
+    private emitUnpackEvent(
+        key: string,
+        requestingNodeId: string,
+        accessGranted: boolean,
+        reason?: string
+    ): void {
+        if (!this.eventStreamer) return;
+        
+        try {
+            // Import StreamEventType dynamically to avoid circular dependencies
+            const { StreamEventType } = require('../events/types');
+            
+            const payload = {
+                key,
+                requestingNodeId,
+                accessGranted,
+                reason
+            };
+            
+            // Get metadata for node identification
+            const item = this._items.get(key);
+            const sourceNode = item?.metadata.sourceNodeName ?? 'Backpack';
+            const namespace = item?.metadata.sourceNamespace;
+            
+            this.eventStreamer.emit(
+                StreamEventType.BACKPACK_UNPACK,
+                payload,
+                {
+                    sourceNode,
+                    nodeId: requestingNodeId,
+                    namespace,
+                    runId: this.runId
+                }
+            );
+        } catch (error) {
+            // Silently fail - telemetry should never break execution
+            console.warn('Failed to emit BACKPACK_UNPACK event:', error);
+        }
+    }
+    
+    /**
+     * Truncate large values for event payloads
+     */
+    private truncateValue(value: any, maxLength: number = 200): string {
+        const str = JSON.stringify(value);
+        if (str.length <= maxLength) {
+            return str;
+        }
+        return str.slice(0, maxLength) + '... (truncated)';
     }
 }
 
