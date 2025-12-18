@@ -73,4 +73,20 @@ export * from './examples';
 export { Node, Flow, BatchNode, ParallelBatchNode, BaseNode } from './pocketflow';
 
 // BackpackFlow v2.0 - Flow with namespace composition
-export { Flow as BackpackFlow, FlowConfig } from './flows/flow'; 
+export { Flow as BackpackFlow, FlowConfig } from './flows/flow';
+
+// v2.0: Serialization Bridge (PRD-003)
+export { 
+    DependencyContainer, 
+    FlowLoader 
+} from './serialization';
+
+// v2.0: Serialization types
+export type {
+    NodeConfig as SerializedNodeConfig,
+    FlowConfig as SerializedFlowConfig,
+    FlowEdge,
+    DependencyManifest,
+    SerializableNode,
+    SerializableNodeClass
+} from './serialization'; 
