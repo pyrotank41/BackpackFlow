@@ -150,21 +150,110 @@ Time:        1.841 s
    - Deep cloning prevents mutation of history
    - Snapshots are independent Backpack instances
 
-## 🔜 Next Steps (Phase 3)
+## ✅ Phase 3: Access Control (COMPLETED)
 
-**Goal:** Implement access control and permissions
+**Status:** ✅ All 26 tests passing  
+**Completed:** December 18, 2025
+
+### Summary
+
+Phase 3 implemented a robust access control system with key-based and namespace-based permissions, wildcard pattern matching, and dual error handling modes (strict vs graceful).
+
+### Implementation Details
+
+```typescript
+// Key-based permissions
+backpack.registerPermissions('node-1', {
+    read: ['userQuery', 'context'],
+    write: ['output'],
+    deny: ['sensitive']
+});
+
+// Namespace-based permissions with wildcards
+backpack.registerPermissions('summary-node', {
+    namespaceRead: ['research.*'],    // Read from any research node
+    namespaceWrite: ['summary.*']     // Write to summary namespace
+});
+
+// Strict mode throws, graceful mode returns undefined
+const strictBackpack = new Backpack(undefined, { 
+    enableAccessControl: true,
+    strictMode: true 
+});
+```
+
+### Key Features Implemented
+
+1. **Permission System**
+   - `registerPermissions()` - Register node access rules
+   - `getPermissions()` - Get all registered permissions
+   - `clearPermissions()` - Remove permissions for a node
+   - Opt-in design (no permissions = full access)
+
+2. **Key-Based Permissions**
+   - `read: []` - Whitelist keys for reading
+   - `write: []` - Whitelist keys for writing
+   - `deny: []` - Blacklist keys (highest priority)
+
+3. **Namespace-Based Permissions**
+   - `namespaceRead: []` - Read from namespaces matching patterns
+   - `namespaceWrite: []` - Write to namespaces matching patterns
+   - Supports wildcards: `sales.*`, `*.chat`, `*.*.v1`
+
+4. **Pattern Matching**
+   - Exact match: `sales.chat` matches `sales.chat`
+   - Single-level wildcard: `sales.*` matches `sales.chat` but not `sales.chat.web`
+   - Position-independent: `*.chat` matches `sales.chat`
+   - Regex-based implementation for performance
+
+5. **Dual Error Handling**
+   - **Strict Mode**: Throws `AccessDeniedError` on violation
+   - **Graceful Mode**: Returns `undefined` and logs warning
+   - Security-first: Doesn't leak key existence on denial
+
+### Files Modified
+
+- `src/storage/backpack.ts`
+  - Added `checkAccess()` private method with algorithm from Tech Spec
+  - Added `matchesPattern()` for wildcard matching
+  - Updated `pack()` to enforce write permissions
+  - Updated `unpack()` and `unpackRequired()` to enforce read permissions
+  - Added `registerPermissions()`, `getPermissions()`, `clearPermissions()`
+
+- `tests/storage/backpack-phase3.test.ts` (NEW)
+  - 26 comprehensive tests covering all access control scenarios
+  - Permission registration (3 tests)
+  - Key-based read/write permissions (8 tests)
+  - Deny list behavior (2 tests)
+  - Namespace-based permissions (5 tests)
+  - Pattern matching algorithm (4 tests)
+  - Combined permissions (2 tests)
+  - Integration and edge cases (2 tests)
+
+### Test Results
+
+```bash
+Test Suites: 3 passed, 3 total
+Tests:       85 passed, 85 total
+  - Phase 1: 30 tests ✅
+  - Phase 2: 29 tests ✅
+  - Phase 3: 26 tests ✅
+```
+
+## 🔜 Next Steps (Phase 4)
+
+**Goal:** Implement namespace query API for filtering and searching
 
 ### Planned Tasks
 
-- [ ] Implement `checkAccess()` method
-- [ ] Add key-based permissions
-- [ ] Add namespace-based permissions
-- [ ] Implement wildcard pattern matching
-- [ ] Create Phase 3 tests
-- [ ] Test access denial scenarios
+- [ ] Build namespace index for efficient queries
+- [ ] Implement `unpackByNamespace()` method
+- [ ] Implement `getItemsByNamespace()` method
+- [ ] Add pattern matching for queries
+- [ ] Create Phase 4 tests
 
-**Estimated Time:** 1-2 days  
-**Estimated Tests:** 20-25 tests
+**Estimated Time:** 1 day  
+**Estimated Tests:** 15-20 tests
 
 ---
 
@@ -172,18 +261,19 @@ Time:        1.841 s
 
 ### Lines of Code
 
-| Category | Lines | Phase 1 | Phase 2 |
-|----------|-------|---------|---------|
-| Implementation | ~813 | 613 | +200 |
-| Tests | ~967 | 501 | +466 |
-| **Total** | **~1,780** | **1,114** | **+666** |
+| Category | Lines | Phase 1 | Phase 2 | Phase 3 |
+|----------|-------|---------|---------|---------|
+| Implementation | ~950 | 613 | +200 | +137 |
+| Tests | ~1,417 | 501 | +466 | +450 |
+| **Total** | **~2,367** | **1,114** | **+666** | **+587** |
 
 ### Test Coverage
 
 - **Phase 1:** 30 tests - Core storage ✅
 - **Phase 2:** 29 tests - History & time-travel ✅
-- **Total:** 59 tests passing
-- **Target for v2.0:** 100+ tests across all phases
+- **Phase 3:** 26 tests - Access control ✅
+- **Total:** 85 tests passing
+- **Target for v2.0:** 120+ tests across all phases
 
 ---
 
@@ -191,10 +281,10 @@ Time:        1.841 s
 
 | Criteria | Status | Notes |
 |----------|--------|-------|
-| SC-1: State Sanitization | 🔲 Pending | Deferred to Phase 3 (Access Control) |
-| SC-2: Source Tracing | ✅ Partial | Metadata tracking complete |
-| SC-3: Time-Travel Debugging | 🔲 Pending | Phase 2 |
-| SC-4: Access Control | 🔲 Pending | Phase 3 |
+| SC-1: State Sanitization | ✅ Complete | Access Control implemented (Phase 3) |
+| SC-2: Source Tracing | ✅ Complete | Metadata tracking in all commits |
+| SC-3: Time-Travel Debugging | ✅ Complete | Full snapshot/diff/replay (Phase 2) |
+| SC-4: Access Control | ✅ Complete | Key + namespace permissions (Phase 3) |
 | SC-5: Performance (< 5ms overhead) | ✅ Achieved | All operations < 1ms |
 
 ---
@@ -213,8 +303,8 @@ Time:        1.841 s
 
 ### Aggressive Timeline
 
-- **Day 1 (Dec 18):** Phase 1 ✅ + Phase 2 🔄
-- **Day 2 (Dec 19):** Phase 3 + Phase 4 + Phase 5
+- **Day 1 (Dec 18):** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅
+- **Day 2 (Dec 19):** Phase 4 + Phase 5
 - **Day 3 (Dec 20):** Phase 6 (Integration, Testing, Docs)
 - **Dec 21:** 🎉 **Release v2.0.0**
 

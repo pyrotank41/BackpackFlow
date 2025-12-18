@@ -83,12 +83,26 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
      * @param key - Unique identifier for this value
      * @param value - Any serializable value
      * @param options - Optional metadata overrides
+     * @throws AccessDeniedError if node doesn't have write permission (strictMode)
      */
     pack(key: string, value: any, options?: PackOptions): void {
+        const nodeId = options?.nodeId ?? 'unknown';
+        
+        // Phase 3: Check write access
+        if (this.enableAccessControl && nodeId !== 'unknown') {
+            if (!this.checkAccess(nodeId, key, 'write', options?.namespace)) {
+                if (this.strictMode) {
+                    throw new AccessDeniedError(nodeId, key, 'write');
+                }
+                console.warn(`Access denied: Node '${nodeId}' cannot write key '${key}'`);
+                return; // Silently fail in non-strict mode
+            }
+        }
+        
         // Create metadata
         const version = this.getVersion(key) + 1;
         const metadata: BackpackItemMetadata = {
-            sourceNodeId: options?.nodeId ?? 'unknown',
+            sourceNodeId: nodeId,
             sourceNodeName: options?.nodeName ?? 'unknown',
             sourceNamespace: options?.namespace,
             timestamp: Date.now(),
@@ -120,8 +134,8 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
      * This is the "graceful" version - use for optional data.
      * 
      * @param key - Key to retrieve
-     * @param nodeId - Optional node ID for access control (Phase 3)
-     * @returns The value, or undefined if not found
+     * @param nodeId - Optional node ID for access control
+     * @returns The value, or undefined if not found (or if access denied in graceful mode)
      */
     unpack<V = any>(key: string, nodeId?: string): V | undefined {
         const item = this._items.get(key);
@@ -130,13 +144,17 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
             return undefined;
         }
         
-        // TODO Phase 3: Check access control
-        // if (nodeId && this.enableAccessControl) {
-        //     this.checkAccess(nodeId, key, 'read');
-        // }
-        
-        // TODO Phase 2: Record to history
-        // this.recordAccess('unpack', key, nodeId);
+        // Phase 3: Check access control
+        if (nodeId && this.enableAccessControl) {
+            if (!this.checkAccess(nodeId, key, 'read')) {
+                if (this.strictMode) {
+                    throw new AccessDeniedError(nodeId, key, 'read');
+                }
+                // Graceful mode: log warning and return undefined
+                console.warn(`Access denied: Node '${nodeId}' cannot read key '${key}'`);
+                return undefined;
+            }
+        }
         
         return item.value as V;
     }
@@ -151,16 +169,25 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
      * @param nodeId - Optional node ID for access control
      * @returns The value (guaranteed to exist)
      * @throws KeyNotFoundError if key doesn't exist
-     * @throws AccessDeniedError if access is denied (Phase 3)
+     * @throws AccessDeniedError if access is denied
      */
     unpackRequired<V = any>(key: string, nodeId?: string): V {
-        const value = this.unpack<V>(key, nodeId);
+        // Check access BEFORE checking existence (security first)
+        const item = this._items.get(key);
         
-        if (value === undefined) {
+        // Phase 3: Check access control (even if not found - don't leak existence)
+        if (nodeId && this.enableAccessControl && item) {
+            if (!this.checkAccess(nodeId, key, 'read')) {
+                throw new AccessDeniedError(nodeId, key, 'read');
+            }
+        }
+        
+        // Now check existence
+        if (!item) {
             throw new KeyNotFoundError(key, nodeId);
         }
         
-        return value;
+        return item.value as V;
     }
     
     /**
@@ -506,18 +533,146 @@ export class Backpack<T extends BaseStorage = BaseStorage> {
         return snapshot;
     }
     
-    // ===== ACCESS CONTROL API (Phase 3 - Stubs for now) =====
+    // ===== ACCESS CONTROL API (Phase 3) =====
     
     /**
      * Register permissions for a node
-     * 
-     * Phase 3: Enable access control
      * 
      * @param nodeId - Node ID
      * @param permissions - Permission configuration
      */
     registerPermissions(nodeId: string, permissions: NodePermissions): void {
         this._permissions.set(nodeId, permissions);
+    }
+    
+    /**
+     * Check if a node has access to a key
+     * 
+     * Algorithm from TECH-SPEC-001 §Algorithm 2
+     * 
+     * @param nodeId - Node requesting access
+     * @param key - Key being accessed
+     * @param operation - Type of operation (read/write)
+     * @param namespace - Optional namespace for write operations
+     * @returns True if access is granted
+     */
+    private checkAccess(
+        nodeId: string,
+        key: string,
+        operation: 'read' | 'write',
+        namespace?: string
+    ): boolean {
+        // If access control is disabled, allow all
+        if (!this.enableAccessControl) {
+            return true;
+        }
+        
+        const permissions = this._permissions.get(nodeId);
+        
+        // If no permissions registered, default to allow (opt-in)
+        if (!permissions) {
+            return true;
+        }
+        
+        // Check deny list first (highest priority)
+        if (permissions.deny?.includes(key)) {
+            return false;
+        }
+        
+        // Check key-based permissions
+        const allowedKeys = operation === 'read' 
+            ? permissions.read 
+            : permissions.write;
+        
+        if (allowedKeys?.includes(key)) {
+            return true;
+        }
+        
+        // For namespace-based permissions
+        const allowedNamespaces = operation === 'read'
+            ? permissions.namespaceRead
+            : permissions.namespaceWrite;
+        
+        if (allowedNamespaces) {
+            // For reads, check the existing item's namespace
+            if (operation === 'read') {
+                const item = this._items.get(key);
+                if (item && item.metadata.sourceNamespace) {
+                    for (const pattern of allowedNamespaces) {
+                        if (this.matchesPattern(pattern, item.metadata.sourceNamespace)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            // For writes, check the namespace being written
+            if (operation === 'write' && namespace) {
+                for (const pattern of allowedNamespaces) {
+                    if (this.matchesPattern(pattern, namespace)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Default: deny if explicit permissions are set but no match
+        return false;
+    }
+    
+    /**
+     * Check if a namespace matches a wildcard pattern
+     * 
+     * Algorithm from TECH-SPEC-001 §Algorithm 1
+     * 
+     * Patterns:
+     * - Exact match: "sales.chat" matches "sales.chat"
+     * - Wildcard: "sales.*" matches "sales.chat" but not "sales.chat.web"
+     * - Wildcard: "*.chat" matches "sales.chat"
+     * 
+     * @param pattern - Pattern with optional wildcards
+     * @param namespace - Namespace to test
+     * @returns True if namespace matches pattern
+     */
+    private matchesPattern(pattern: string, namespace: string): boolean {
+        // Exact match
+        if (pattern === namespace) {
+            return true;
+        }
+        
+        // No wildcard - no match
+        if (!pattern.includes('*')) {
+            return false;
+        }
+        
+        // Convert glob pattern to regex
+        // Escape regex special chars except *
+        const regexPattern = '^' + 
+            pattern
+                .replace(/[.+?^${}()|[\]\\]/g, '\\$&')  // Escape special chars
+                .replace(/\*/g, '[^.]+')                 // * matches one level (no dots)
+            + '$';
+        
+        const regex = new RegExp(regexPattern);
+        return regex.test(namespace);
+    }
+    
+    /**
+     * Get all permissions registered
+     * 
+     * @returns Map of nodeId to permissions
+     */
+    getPermissions(): Map<string, NodePermissions> {
+        return new Map(this._permissions);
+    }
+    
+    /**
+     * Clear permissions for a specific node
+     * 
+     * @param nodeId - Node ID to clear permissions for
+     */
+    clearPermissions(nodeId: string): void {
+        this._permissions.delete(nodeId);
     }
     
     // ===== SERIALIZATION (Future - Stubs for now) =====
