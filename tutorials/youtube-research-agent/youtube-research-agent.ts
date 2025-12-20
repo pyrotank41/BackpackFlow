@@ -10,6 +10,7 @@
 import { Flow } from '../../src/flows/flow';
 import { Backpack } from '../../src/storage/backpack';
 import { EventStreamer, StreamEventType } from '../../src/events';
+import { BackpackNode } from '../../src/nodes/backpack-node';
 import { BaseChatCompletionNode } from './base-chat-completion-node';
 import { YouTubeSearchNode } from './youtube-search-node';
 import { DataAnalysisNode } from './data-analysis-node';
@@ -19,15 +20,88 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * YouTube Research Agent
+ * YouTube Research Agent Node
+ * 
+ * A composable agent that can be added to any flow.
+ * Internally manages its own 3-node pipeline.
  * 
  * Architecture:
  *   Search → Analyze → Summarize
  * 
  * Flow:
  *   1. YouTubeSearchNode: Search YouTube for query
- *   2. DataAnalysisNode: Find outlier videos (10x median views)
+ *   2. DataAnalysisNode: Find outlier videos (channel-relative)
  *   3. BaseChatCompletionNode: Explain why outliers are successful
+ */
+class YouTubeResearchAgentNode extends BackpackNode {
+    static namespaceSegment = "agent";
+    
+    async prep(shared: any): Promise<any> {
+        // Get query from backpack
+        const query = this.unpackRequired<string>('searchQuery');
+        return { query };
+    }
+    
+    async _exec(input: any): Promise<any> {
+        // Create internal flow that inherits our namespace
+        // If we're at "youtube.research.agent", internal nodes become:
+        // - "youtube.research.agent.search"
+        // - "youtube.research.agent.analysis"
+        // - "youtube.research.agent.summary"
+        const internalFlow = new Flow({
+            namespace: this.namespace,
+            backpack: this.backpack,
+            eventStreamer: (this as any).eventStreamer
+        });
+        
+        // 1. YouTube Search Node
+        const searchNode = internalFlow.addNode(YouTubeSearchNode, {
+            id: 'search',
+            apiKey: process.env.YOUTUBE_API_KEY || '',
+            maxResults: 50
+        });
+        
+        // 2. Data Analysis Node
+        const analysisNode = internalFlow.addNode(DataAnalysisNode, {
+            id: 'analysis',
+            metric: 'views',
+            threshold: 1.5 // 1.5x channel average = breakthrough video
+        });
+        
+        // 3. Chat Completion Node (for insights)
+        const summaryNode = internalFlow.addNode(BaseChatCompletionNode, {
+            id: 'summary',
+            model: 'gpt-4',
+            temperature: 0.7,
+            systemPrompt: `You are a YouTube analytics expert. Analyze outlier videos and explain why they're successful. Focus on:
+- Title strategies
+- Timing and trends
+- Engagement patterns
+- Content uniqueness
+
+Be specific and actionable.`
+        });
+        
+        // Setup flow edges (routing)
+        searchNode.on('complete', analysisNode);
+        analysisNode.on('complete', summaryNode);
+        
+        // Set entry node and run
+        internalFlow.setEntryNode(searchNode);
+        await internalFlow.run({});
+        
+        return { success: true };
+    }
+    
+    async post(backpack: any, shared: any, output: any): Promise<string | undefined> {
+        return 'complete';
+    }
+}
+
+/**
+ * YouTube Research Agent Orchestrator
+ * 
+ * Sets up the agent and provides a clean interface for running queries.
  */
 class YouTubeResearchAgent {
     private flow: Flow;
@@ -47,94 +121,122 @@ class YouTubeResearchAgent {
             enableAccessControl: false // Simplified for tutorial
         });
         
-        // Create flow
+        // Create main flow
         this.flow = new Flow({
             namespace: 'youtube.research',
             backpack: this.backpack,
             eventStreamer: this.streamer
         });
         
-        // Setup nodes
-        this.setupNodes();
+        // Add the agent node (which contains the internal flow)
+        const agentNode = this.flow.addNode(YouTubeResearchAgentNode, {
+            id: 'agent'
+        });
         
-        // Setup event logging
+        this.flow.setEntryNode(agentNode);
+        
+        // Setup event logging with nesting support
         this.setupEventLogging();
     }
     
     /**
-     * Setup the three nodes in our agent
-     */
-    private setupNodes(): void {
-        // 1. YouTube Search Node
-        const searchNode = this.flow.addNode(YouTubeSearchNode, {
-            id: 'search',
-            apiKey: process.env.YOUTUBE_API_KEY || '',
-            maxResults: 50
-        });
-        
-        // 2. Data Analysis Node
-        const analysisNode = this.flow.addNode(DataAnalysisNode, {
-            id: 'analysis',
-            metric: 'views',
-            threshold: 1.5 // 1.5x channel average = breakthrough video
-        });
-        
-        // 3. Chat Completion Node (for insights)
-        const summaryNode = this.flow.addNode(BaseChatCompletionNode, {
-            id: 'summary',
-            model: 'gpt-4',
-            temperature: 0.7,
-            systemPrompt: `You are a YouTube analytics expert. Analyze outlier videos and explain why they're successful. Focus on:
-- Title strategies
-- Timing and trends
-- Engagement patterns
-- Content uniqueness
-
-Be specific and actionable.`
-        });
-        
-        // Setup flow edges (routing)
-        // On success, flow continues through the pipeline
-        searchNode.on('complete', analysisNode);
-        analysisNode.on('complete', summaryNode);
-        
-        // For error/terminal actions like 'no_results' and 'no_outliers',
-        // we don't register successors - the flow will terminate gracefully
-        
-        // Set entry node
-        this.flow.setEntryNode(searchNode);
-    }
-    
-    /**
-     * Setup event logging for observability
+     * Setup event logging for observability with hierarchical nested flow support
      */
     private setupEventLogging(): void {
         const startTime = Date.now();
+        const nodeStack: Array<{ name: string, startTime: number, namespace: string }> = [];
         
         this.streamer.on('*', (event) => {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-            const prefix = `[${elapsed}s]`;
+            
+            // Calculate nesting depth from namespace
+            const namespace = event.namespace || '';
+            const namespaceDepth = namespace.split('.').length;
+            
+            // Indent based on how many parents are currently open
+            const openParentsCount = nodeStack.filter(n => 
+                namespace.startsWith(n.namespace + '.') && n.namespace !== namespace
+            ).length;
+            const indent = '│  '.repeat(openParentsCount);
             
             switch (event.type) {
                 case StreamEventType.NODE_START:
-                    console.log(`${prefix} 🚀 Starting ${event.sourceNode}...`);
+                    // Close previous sibling nodes at same level
+                    while (nodeStack.length > 0) {
+                        const top = nodeStack[nodeStack.length - 1];
+                        const topDepth = top.namespace.split('.').length;
+                        
+                        // If top is at same level or deeper, and not a parent of current
+                        if (topDepth >= namespaceDepth && !namespace.startsWith(top.namespace + '.')) {
+                            const closingNode = nodeStack.pop()!;
+                            const closingDepth = closingNode.namespace.split('.').length;
+                            const closingParents = nodeStack.filter(n => 
+                                closingNode.namespace.startsWith(n.namespace + '.')
+                            ).length;
+                            const closingIndent = '│  '.repeat(closingParents);
+                            const nodeDuration = ((Date.now() - closingNode.startTime) / 1000).toFixed(2);
+                            console.log(`${closingIndent}└─ [${elapsed}s] ✓ Complete (${nodeDuration}s total)\n`);
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // Start new node with proper indentation
+                    nodeStack.push({ name: event.sourceNode, startTime: Date.now(), namespace });
+                    
+                    const padding = '─'.repeat(Math.max(0, 60 - indent.length - event.sourceNode.length));
+                    console.log(`${indent}┌─ ${event.sourceNode} ${padding}`);
+                    console.log(`${indent}│  [${elapsed}s] 🚀 Starting...`);
+                    break;
+                    
+                case StreamEventType.PREP_COMPLETE:
+                    console.log(`${indent}│  [${elapsed}s] ✓ Preparation phase complete`);
                     break;
                     
                 case StreamEventType.EXEC_COMPLETE:
                     const duration = event.payload.durationMs;
-                    console.log(`${prefix} ⚡ ${event.sourceNode} complete (${duration}ms)`);
+                    // Only show for leaf nodes or when they're actually doing work
+                    if (nodeStack.length > 0 && nodeStack[nodeStack.length - 1].namespace === namespace) {
+                        console.log(`${indent}│  [${elapsed}s] ⚡ Execution complete (${duration}ms)`);
+                    }
                     break;
                     
                 case StreamEventType.NODE_END:
-                    console.log(`${prefix} ✅ ${event.sourceNode} → ${event.payload.action}`);
+                    // Find the matching node in the stack
+                    const nodeIndex = nodeStack.findIndex(n => n.namespace === namespace);
+                    if (nodeIndex !== -1) {
+                        // Close all children first
+                        while (nodeStack.length > nodeIndex + 1) {
+                            const childNode = nodeStack.pop()!;
+                            const childParents = nodeStack.filter(n => 
+                                childNode.namespace.startsWith(n.namespace + '.')
+                            ).length;
+                            const childIndent = '│  '.repeat(childParents);
+                            const childDuration = ((Date.now() - childNode.startTime) / 1000).toFixed(2);
+                            console.log(`${childIndent}└─ [${elapsed}s] ✓ Complete (${childDuration}s total)\n`);
+                        }
+                        
+                        // Now close this node
+                        const node = nodeStack.pop()!;
+                        const nodeDuration = ((Date.now() - node.startTime) / 1000).toFixed(2);
+                        const action = event.payload.action;
+                        console.log(`${indent}│  [${elapsed}s] → Next: ${action}`);
+                        console.log(`${indent}└─ [${elapsed}s] ✓ Complete (${nodeDuration}s total)\n`);
+                    }
                     break;
                     
                 case StreamEventType.ERROR:
-                    console.log(`${prefix} ❌ Error in ${event.sourceNode}: ${event.payload.error}`);
+                    console.log(`${indent}│  [${elapsed}s] ❌ Error: ${event.payload.error}`);
+                    const errorNodeIndex = nodeStack.findIndex(n => n.namespace === namespace);
+                    if (errorNodeIndex !== -1) {
+                        console.log(`${indent}└─ [${elapsed}s] ✗ Failed\n`);
+                        nodeStack.splice(errorNodeIndex, 1);
+                    }
                     break;
                     
                 case StreamEventType.BACKPACK_PACK:
-                    console.log(`${prefix} 💾 Packed '${event.payload.key}'`);
+                    const key = event.payload.key;
+                    console.log(`${indent}│  [${elapsed}s] 💾 Packed '${key}'`);
                     break;
             }
         });
@@ -149,9 +251,6 @@ Be specific and actionable.`
         console.log(`${'='.repeat(80)}`);
         console.log(`Query: "${query}"\n`);
         
-        // Show the flow architecture
-        this.displayFlowArchitecture();
-        
         try {
             // Pack initial input
             this.backpack.pack('searchQuery', query, {
@@ -159,7 +258,7 @@ Be specific and actionable.`
                 nodeName: 'UserInput'
             });
             
-            console.log(`\n${'─'.repeat(80)}`);
+            console.log(`${'─'.repeat(80)}`);
             console.log(`🎬 EXECUTION TIMELINE`);
             console.log(`${'─'.repeat(80)}\n`);
             
@@ -169,6 +268,9 @@ Be specific and actionable.`
             console.log(`\n${'─'.repeat(80)}`);
             console.log(`✅ Flow Complete!`);
             console.log(`${'─'.repeat(80)}`);
+            
+            // Show the architecture that was executed
+            this.displayFlowArchitecture();
             
             // Display execution summary
             this.displayExecutionSummary();
@@ -183,40 +285,55 @@ Be specific and actionable.`
     }
     
     /**
-     * Display the flow architecture
+     * Display the flow architecture dynamically from event history
+     * Shows the actual execution structure with nested flows
      */
     private displayFlowArchitecture(): void {
-        console.log(`📊 AGENT ARCHITECTURE`);
+        console.log(`\n📊 FLOW ARCHITECTURE`);
         console.log(`${'─'.repeat(80)}\n`);
-        console.log(`   ┌─────────────────────┐`);
-        console.log(`   │  User Query Input   │`);
-        console.log(`   └──────────┬──────────┘`);
-        console.log(`              │ searchQuery`);
-        console.log(`              ▼`);
-        console.log(`   ┌─────────────────────┐`);
-        console.log(`   │ YouTubeSearchNode   │ → Search YouTube API`);
-        console.log(`   │  (youtube.research  │    Get 50 videos with stats`);
-        console.log(`   │      .search)       │`);
-        console.log(`   └──────────┬──────────┘`);
-        console.log(`              │ searchResults, searchMetadata`);
-        console.log(`              ▼`);
-        console.log(`   ┌─────────────────────┐`);
-        console.log(`   │  DataAnalysisNode   │ → Find channel-relative outliers`);
-        console.log(`   │  (youtube.research  │    Compare each video to its`);
-        console.log(`   │     .analysis)      │    channel's baseline`);
-        console.log(`   └──────────┬──────────┘`);
-        console.log(`              │ outliers, statistics, prompt`);
-        console.log(`              ▼`);
-        console.log(`   ┌─────────────────────┐`);
-        console.log(`   │BaseChatCompletionNode│ → Generate AI insights`);
-        console.log(`   │  (youtube.research  │    Explain why videos succeeded`);
-        console.log(`   │     .summary)       │`);
-        console.log(`   └──────────┬──────────┘`);
-        console.log(`              │ chatResponse`);
-        console.log(`              ▼`);
-        console.log(`   ┌─────────────────────┐`);
-        console.log(`   │   Final Results     │`);
-        console.log(`   └─────────────────────┘\n`);
+        
+        // Build node tree from event history
+        const history = this.streamer.getHistory();
+        const nodes: Array<{ name: string, namespace: string }> = [];
+        
+        for (const event of history) {
+            if (event.type === StreamEventType.NODE_START) {
+                const nodeName = event.sourceNode;
+                const namespace = event.namespace || '';
+                if (!nodes.find(n => n.namespace === namespace)) {
+                    nodes.push({ name: nodeName, namespace });
+                }
+            }
+        }
+        
+        // Sort by namespace depth to show hierarchy
+        nodes.sort((a, b) => {
+            const depthA = a.namespace.split('.').length;
+            const depthB = b.namespace.split('.').length;
+            if (depthA !== depthB) return depthA - depthB;
+            return a.namespace.localeCompare(b.namespace);
+        });
+        
+        console.log(`   User Input`);
+        console.log(`        ↓`);
+        
+        for (const node of nodes) {
+            const depth = node.namespace.split('.').length - 2; // Subtract base depth
+            const indent = '      '.repeat(Math.max(0, depth));
+            const isParent = nodes.some(n => n.namespace.startsWith(node.namespace + '.'));
+            const marker = isParent ? '📦' : '⚙️ ';
+            
+            console.log(`${indent}${marker} ${node.name}`);
+            console.log(`${indent}   (${node.namespace})`);
+            
+            if (isParent) {
+                console.log(`${indent}   ├─ Internal Flow:`);
+            } else {
+                console.log(`${indent}        ↓`);
+            }
+        }
+        
+        console.log(`   Final Results\n`);
     }
     
     /**
@@ -264,20 +381,31 @@ Be specific and actionable.`
         console.log(`${'─'.repeat(80)}\n`);
         
         const packEvents = history.filter(e => e.type === StreamEventType.BACKPACK_PACK);
-        const dataFlow: { [key: string]: string[] } = {};
+        const dataFlow: { [key: string]: string } = {};
         
         for (const event of packEvents) {
             const key = event.payload.key;
-            const source = event.payload.metadata?.nodeName || event.payload.metadata?.nodeId || 'unknown';
+            // Use sourceNode from event, which is the node class name
+            const source = event.sourceNode || event.payload.metadata?.nodeName || event.payload.metadata?.nodeId || 'UserInput';
             
-            if (!dataFlow[key]) {
-                dataFlow[key] = [];
-            }
-            dataFlow[key].push(source);
+            // Keep the last source (most recent)
+            dataFlow[key] = source;
         }
         
-        for (const [key, sources] of Object.entries(dataFlow)) {
-            console.log(`   '${key}' ← ${sources[sources.length - 1]}`);
+        // Group by source for better readability
+        const sourceGroups: { [source: string]: string[] } = {};
+        for (const [key, source] of Object.entries(dataFlow)) {
+            if (!sourceGroups[source]) {
+                sourceGroups[source] = [];
+            }
+            sourceGroups[source].push(key);
+        }
+        
+        for (const [source, keys] of Object.entries(sourceGroups)) {
+            console.log(`   ${source}:`);
+            for (const key of keys) {
+                console.log(`      → '${key}'`);
+            }
         }
         console.log();
     }
