@@ -149,6 +149,9 @@ Be specific and actionable.`
         console.log(`${'='.repeat(80)}`);
         console.log(`Query: "${query}"\n`);
         
+        // Show the flow architecture
+        this.displayFlowArchitecture();
+        
         try {
             // Pack initial input
             this.backpack.pack('searchQuery', query, {
@@ -156,8 +159,19 @@ Be specific and actionable.`
                 nodeName: 'UserInput'
             });
             
+            console.log(`\n${'─'.repeat(80)}`);
+            console.log(`🎬 EXECUTION TIMELINE`);
+            console.log(`${'─'.repeat(80)}\n`);
+            
             // Run the flow
             await this.flow.run({});
+            
+            console.log(`\n${'─'.repeat(80)}`);
+            console.log(`✅ Flow Complete!`);
+            console.log(`${'─'.repeat(80)}`);
+            
+            // Display execution summary
+            this.displayExecutionSummary();
             
             // Display results
             this.displayResults();
@@ -166,6 +180,106 @@ Be specific and actionable.`
             console.error(`\n❌ Agent failed: ${error.message}`);
             throw error;
         }
+    }
+    
+    /**
+     * Display the flow architecture
+     */
+    private displayFlowArchitecture(): void {
+        console.log(`📊 AGENT ARCHITECTURE`);
+        console.log(`${'─'.repeat(80)}\n`);
+        console.log(`   ┌─────────────────────┐`);
+        console.log(`   │  User Query Input   │`);
+        console.log(`   └──────────┬──────────┘`);
+        console.log(`              │ searchQuery`);
+        console.log(`              ▼`);
+        console.log(`   ┌─────────────────────┐`);
+        console.log(`   │ YouTubeSearchNode   │ → Search YouTube API`);
+        console.log(`   │  (youtube.research  │    Get 50 videos with stats`);
+        console.log(`   │      .search)       │`);
+        console.log(`   └──────────┬──────────┘`);
+        console.log(`              │ searchResults, searchMetadata`);
+        console.log(`              ▼`);
+        console.log(`   ┌─────────────────────┐`);
+        console.log(`   │  DataAnalysisNode   │ → Find channel-relative outliers`);
+        console.log(`   │  (youtube.research  │    Compare each video to its`);
+        console.log(`   │     .analysis)      │    channel's baseline`);
+        console.log(`   └──────────┬──────────┘`);
+        console.log(`              │ outliers, statistics, prompt`);
+        console.log(`              ▼`);
+        console.log(`   ┌─────────────────────┐`);
+        console.log(`   │BaseChatCompletionNode│ → Generate AI insights`);
+        console.log(`   │  (youtube.research  │    Explain why videos succeeded`);
+        console.log(`   │     .summary)       │`);
+        console.log(`   └──────────┬──────────┘`);
+        console.log(`              │ chatResponse`);
+        console.log(`              ▼`);
+        console.log(`   ┌─────────────────────┐`);
+        console.log(`   │   Final Results     │`);
+        console.log(`   └─────────────────────┘\n`);
+    }
+    
+    /**
+     * Display execution summary with timeline
+     */
+    private displayExecutionSummary(): void {
+        const history = this.streamer.getHistory();
+        const nodeExecutions: Map<string, { start: number, end: number, duration: number }> = new Map();
+        
+        // Build timeline of node executions
+        for (const event of history) {
+            if (event.type === StreamEventType.NODE_START) {
+                nodeExecutions.set(event.sourceNode, {
+                    start: event.timestamp,
+                    end: 0,
+                    duration: 0
+                });
+            } else if (event.type === StreamEventType.NODE_END) {
+                const exec = nodeExecutions.get(event.sourceNode);
+                if (exec) {
+                    exec.end = event.timestamp;
+                    exec.duration = exec.end - exec.start;
+                }
+            }
+        }
+        
+        console.log(`\n📈 EXECUTION SUMMARY`);
+        console.log(`${'─'.repeat(80)}\n`);
+        
+        const startTime = Math.min(...Array.from(nodeExecutions.values()).map(e => e.start));
+        
+        for (const [nodeName, exec] of nodeExecutions) {
+            const relativeStart = ((exec.start - startTime) / 1000).toFixed(2);
+            const relativeEnd = ((exec.end - startTime) / 1000).toFixed(2);
+            const duration = (exec.duration / 1000).toFixed(2);
+            
+            console.log(`   ${nodeName}`);
+            console.log(`   ├─ Started:  ${relativeStart}s`);
+            console.log(`   ├─ Finished: ${relativeEnd}s`);
+            console.log(`   └─ Duration: ${duration}s\n`);
+        }
+        
+        // Show data flow through Backpack
+        console.log(`📦 DATA FLOW (Backpack State Changes)`);
+        console.log(`${'─'.repeat(80)}\n`);
+        
+        const packEvents = history.filter(e => e.type === StreamEventType.BACKPACK_PACK);
+        const dataFlow: { [key: string]: string[] } = {};
+        
+        for (const event of packEvents) {
+            const key = event.payload.key;
+            const source = event.payload.metadata?.nodeName || event.payload.metadata?.nodeId || 'unknown';
+            
+            if (!dataFlow[key]) {
+                dataFlow[key] = [];
+            }
+            dataFlow[key].push(source);
+        }
+        
+        for (const [key, sources] of Object.entries(dataFlow)) {
+            console.log(`   '${key}' ← ${sources[sources.length - 1]}`);
+        }
+        console.log();
     }
     
     /**
