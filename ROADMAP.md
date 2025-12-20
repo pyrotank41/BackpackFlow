@@ -1,25 +1,28 @@
 # 🗺️ BackpackFlow Roadmap
 
-**Last Updated:** December 17, 2025  
+**Last Updated:** December 20, 2025  
 **Current Version:** v1.2.0  
-**Next Major Release:** v2.0.0
+**Next Major Release:** v2.0.0 ✅ **Feature Complete!**
 
 ---
 
 ## Vision Statement
 
-Transform BackpackFlow from a code-only library into an **observable, config-ready engine** that solves the three critical pain points in AI agent development:
+Transform BackpackFlow from a code-only library into an **observable, config-ready engine** that solves the critical pain points in AI agent development:
 
 1. **The "Black Box" Crisis** → Solved by Telemetry (PRD-002)
 2. **The "Junk Drawer" Problem** → Solved by Backpack Architecture (PRD-001)
 3. **The "No-Code Wall"** → Solved by Serialization Bridge (PRD-003)
+4. **The "Composition Problem"** → Solved by Composite Nodes (PRD-004)
+5. **The "Data Flow Mystery"** → Solved by Complete Observability (PRD-005)
 
 ---
 
 ## Release Plan: v2.0.0 "The Observable Agent"
 
 **Target Release Date:** December 21, 2025 (Q4 2025)  
-**Release Goal:** Ship all three foundational systems together as a cohesive update.
+**Release Status:** ✅ **All Core PRDs Complete** (5/5 implemented, tested, verified)  
+**Release Goal:** Ship all foundational systems together as a cohesive update.
 
 ### Why Release Together?
 
@@ -59,10 +62,10 @@ graph TD
 
 ### 🎒 PRD-001: Backpack Architecture
 
-**Owner:** [TBD]  
 **Priority:** P0 (Foundation)  
-**Status:** Not Started  
-**Document:** [PRD-001-backpack-architecture.md](./docs/prds/PRD-001-backpack-architecture.md)
+**Status:** ✅ **Complete**  
+**Implemented:** December 2025  
+**Document:** [PRD-001-backpack-architecture.md](./docs/v2.0/prds/PRD-001-backpack-architecture.md)
 
 #### Problem Solved
 Eliminates "Context Pollution" where shared state becomes a junk drawer of stale/corrupted data.
@@ -87,10 +90,10 @@ Eliminates "Context Pollution" where shared state becomes a junk drawer of stale
 
 ### 📡 PRD-002: Standardized Telemetry System
 
-**Owner:** [TBD]  
 **Priority:** P0 (Foundation)  
-**Status:** Not Started  
-**Document:** [PRD-002-telemetry-system.md](./docs/prds/PRD-002-telemetry-system.md)
+**Status:** ✅ **Complete**  
+**Implemented:** December 2025  
+**Document:** [PRD-002-telemetry-system.md](./docs/v2.0/prds/PRD-002-telemetry-system.md)
 
 #### Problem Solved
 Eliminates the "Black Box" debugging nightmare by automatically emitting lifecycle events.
@@ -115,10 +118,10 @@ Eliminates the "Black Box" debugging nightmare by automatically emitting lifecyc
 
 ### 🔌 PRD-003: Serialization Bridge
 
-**Owner:** [TBD]  
 **Priority:** P1 (Enabler)  
-**Status:** Not Started  
-**Document:** [PRD-003-serialization-bridge.md](./docs/prds/PRD-003-serialization-bridge.md)
+**Status:** ✅ **Complete**  
+**Implemented:** December 2025  
+**Document:** [PRD-003-serialization-bridge.md](./docs/v2.0/prds/PRD-003-serialization-bridge.md)
 
 #### Problem Solved
 Enables "Low-Code" workflows by making nodes instantiable from JSON configs.
@@ -138,6 +141,64 @@ Enables "Low-Code" workflows by making nodes instantiable from JSON configs.
 
 #### Estimated Effort
 4 weeks (1 engineer)
+
+---
+
+### 🔀 PRD-004: Composite Nodes & Nested Flows
+
+**Priority:** P1 (Core Feature)  
+**Status:** ✅ **Complete**  
+**Implemented:** December 20, 2025  
+**Document:** [PRD-004-composite-nodes.md](./docs/v2.0/prds/PRD-004-composite-nodes.md)
+
+#### Problem Solved
+Standardizes composite nodes (agents with internal flows) and enables complete nested flow serialization.
+
+#### Key Deliverables
+- ✅ `FlowAction` enum for type-safe routing
+- ✅ Convenience methods (`.onComplete()`, `.onError()`, etc.)
+- ✅ `createInternalFlow()` helper with auto-wiring (namespace, backpack, eventStreamer)
+- ✅ Recursive flow serialization with circular reference detection
+- ✅ Query utilities (`flattenNodes()`, `findNode()`, `getMaxDepth()`, etc.)
+- ✅ Immutable internal flows (create once, run many)
+
+#### Success Metrics
+- **Composition Test:** Build YouTube Research Agent with 3-node internal flow
+- **Serialization Test:** Nested flow serializes to JSON with `internalFlow` property
+- **Event Test:** Events from nested flows include correct namespace paths
+- **Query Test:** `findNode('agent.search')` correctly locates nested node
+
+#### Estimated Effort
+3 weeks (1 engineer)
+
+---
+
+### 🔍 PRD-005: Complete Flow Observability
+
+**Priority:** P1 (Core Feature)  
+**Status:** ✅ **Complete**  
+**Implemented:** December 2025  
+**Document:** [PRD-005-complete-flow-observability.md](./docs/v2.0/prds/PRD-005-complete-flow-observability.md)
+
+#### Problem Solved
+Eliminates "data flow mystery" by making all node inputs/outputs explicitly declared and validated.
+
+#### Key Deliverables
+- ✅ Zod-based data contracts (`static inputs` and `static outputs`)
+- ✅ Runtime validation with detailed error messages
+- ✅ Type inference (`z.infer<typeof Schema>`)
+- ✅ JSON Schema export for UI generation
+- ✅ Data mappings on edges for key remapping
+- ✅ Enhanced `toConfig()` with input/output contract serialization
+
+#### Success Metrics
+- **Contract Test:** Invalid input data throws `ContractValidationError`
+- **Mapping Test:** Edge with `{ chatResponse: 'userQuery' }` correctly remaps keys
+- **Type Test:** TypeScript infers correct types from Zod schemas
+- **Serialization Test:** Contracts serialize to JSON Schema
+
+#### Estimated Effort
+3 weeks (1 engineer)
 
 ---
 
@@ -406,11 +467,15 @@ See individual PRDs for detailed task lists. Key contribution areas:
 ---
 
 **Related Documents:**
-- [PRD-001: Backpack Architecture](./docs/v2.0/prds/PRD-001-backpack-architecture.md)
-- [PRD-002: Telemetry System](./docs/v2.0/prds/PRD-002-telemetry-system.md)
-- [PRD-003: Serialization Bridge](./docs/v2.0/prds/PRD-003-serialization-bridge.md)
+- [PRD-001: Backpack Architecture](./docs/v2.0/prds/PRD-001-backpack-architecture.md) - ✅ Complete
+- [PRD-002: Telemetry System](./docs/v2.0/prds/PRD-002-telemetry-system.md) - ✅ Complete
+- [PRD-003: Serialization Bridge](./docs/v2.0/prds/PRD-003-serialization-bridge.md) - ✅ Complete
+- [PRD-004: Composite Nodes & Nested Flows](./docs/v2.0/prds/PRD-004-composite-nodes.md) - ✅ Complete
+- [PRD-005: Complete Flow Observability](./docs/v2.0/prds/PRD-005-complete-flow-observability.md) - ✅ Complete
+- [PRD-006: Documentation & Developer Experience](./docs/v2.0/prds/PRD-006-documentation-developer-experience.md) - 📋 Planned (v2.1)
 - [TECH-SPEC-001: Backpack Implementation](./docs/v2.0/specs/TECH-SPEC-001-backpack-implementation.md)
 - [DECISIONS-AUDIT-v2.0](./docs/v2.0/specs/DECISIONS-AUDIT-v2.0.md)
 - [Migration Guide v1→v2](./docs/v2.0/migration/MIGRATION-v1-to-v2.md)
-- [Original PRD](./docs/legacy/PRD-legacy.md) *(Deprecated - superseded by PRD-001/002/003)*
+- [V2.0 Completion Summary](./docs/v2.0/V2.0-COMPLETION-SUMMARY.md) - ✅ All PRDs Complete!
+- [Original PRD](./docs/legacy/PRD-legacy.md) *(Deprecated - superseded by v2.0 PRDs)*
 

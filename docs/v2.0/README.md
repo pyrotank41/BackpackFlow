@@ -1,7 +1,8 @@
 # v2.0 Documentation
 
-**Status:** 🚧 **In Development**  
-**Target Release:** December 21, 2025 (Q4 2025)
+**Status:** ✅ **Feature Complete** (Testing & Release Prep)  
+**Target Release:** December 21, 2025 (Q4 2025)  
+**Last Updated:** December 20, 2025
 
 This directory contains all documentation for BackpackFlow v2.0.
 
@@ -34,9 +35,12 @@ v2.0/
 
 | Document | Status | Priority | Description |
 |----------|--------|----------|-------------|
-| [PRD-001: Backpack Architecture](./prds/PRD-001-backpack-architecture.md) | Draft | P0 | Core state management with Git-like history |
-| [PRD-002: Telemetry System](./prds/PRD-002-telemetry-system.md) | Draft | P0 | Automatic event emission for observability |
-| [PRD-003: Serialization Bridge](./prds/PRD-003-serialization-bridge.md) | Draft | P1 | Config-driven node instantiation |
+| [PRD-001: Backpack Architecture](./prds/PRD-001-backpack-architecture.md) | ✅ Complete | P0 | Core state management with Git-like history |
+| [PRD-002: Telemetry System](./prds/PRD-002-telemetry-system.md) | ✅ Complete | P0 | Automatic event emission for observability |
+| [PRD-003: Serialization Bridge](./prds/PRD-003-serialization-bridge.md) | ✅ Complete | P1 | Config-driven node instantiation |
+| [PRD-004: Composite Nodes & Nested Flows](./prds/PRD-004-composite-nodes.md) | ✅ Complete | P1 | Internal flows, convenience methods, recursive serialization |
+| [PRD-005: Complete Flow Observability](./prds/PRD-005-complete-flow-observability.md) | ✅ Complete | P1 | Data contracts (Zod), data mappings, enhanced serialization |
+| [PRD-006: Documentation & Developer Experience](./prds/PRD-006-documentation-developer-experience.md) | 📋 Planned | P1 | Docusaurus site, API docs, guides (v2.1) |
 
 ---
 
@@ -97,5 +101,5 @@ v2.0/
 
 ---
 
-**Last Updated:** December 18, 2025
+**🎉 All v2.0 Core PRDs Complete!** See [V2.0-COMPLETION-SUMMARY.md](./V2.0-COMPLETION-SUMMARY.md) for implementation details.
 

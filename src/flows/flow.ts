@@ -108,9 +108,9 @@ export class Flow<S = any> {
      * @param config - Node configuration
      * @returns Instantiated node
      */
-    addNode<T extends BackpackNode>(
-        NodeClass: typeof BackpackNode & { new(config: NodeConfig, context: NodeContext): T },
-        config: NodeConfig
+    addNode<T extends BackpackNode, C extends NodeConfig = NodeConfig>(
+        NodeClass: typeof BackpackNode & { new(config: C, context: NodeContext): T },
+        config: C
     ): T {
         // Get namespace segment from node class or config
         const segment = (NodeClass as any).namespaceSegment || config.id;
@@ -132,6 +132,18 @@ export class Flow<S = any> {
         this.nodes.set(config.id, node);
         
         return node;
+    }
+    
+    /**
+     * Register an already-instantiated node in the flow
+     * 
+     * Used by FlowLoader when deserializing nodes that were created via fromConfig()
+     * 
+     * @param id - Node ID
+     * @param node - Node instance
+     */
+    registerNode(id: string, node: BackpackNode): void {
+        this.nodes.set(id, node);
     }
     
     /**

@@ -7,7 +7,7 @@ A TypeScript-first, config-driven LLM framework built on top of [PocketFlow](htt
 [![npm version](https://badge.fury.io/js/backpackflow.svg)](https://badge.fury.io/js/backpackflow)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-> **⚠️ Work in Progress**: This is a side project under active development. APIs are bound to change as we build toward v2.0. Use at your own risk!
+> **⚡ v2.0 "The Observable Agent"** - Build production-ready AI agents with complete observability, Zod-based type safety, and nested flow composition. TypeScript-first, config-driven, and ready for visual builders.
 
 ---
 
@@ -83,48 +83,84 @@ Build your backend logic AND your web UI in the same language. Share types, sche
 
 ---
 
-## 📍 Current Status & Roadmap
+## 📍 Current Version: v2.0.0
 
-- **Current Version**: v1.2.0 - Event-driven streaming + Explicit LLM client injection
-- **Next Major Release**: v2.0.0 - "The Observable Agent"
-- **Target Release Date**: December 21, 2025 (Q4 2025)
-- **Phase**: Active Development
-- **Current Focus**: Backpack architecture, Telemetry system, Config serialization
+**"The Observable Agent"** - Complete rewrite with production-ready observability
 
-👉 **[See Full Roadmap](./ROADMAP.md)** - Detailed v2.0 feature breakdown and timeline
+- **Architecture**: Git-like state management with immutable history
+- **Type Safety**: Full Zod schema validation with type inference
+- **Observability**: Automatic event emission and time-travel debugging
+- **Composition**: Nested flows with recursive serialization
+- **Config-Driven**: Complete JSON serialization for visual builders
+
+👉 **[See Full Roadmap](./ROADMAP.md)** | **[Migration from v1.x](./docs/v2.0/migration/MIGRATION-v1-to-v2.md)**
 
 ## ✨ Features
 
-### Current Version (v1.2.0)
+### Core Architecture (v2.0)
 
-- **🤖 Intelligent Agents**: Pre-built `AgentNode` with decision-making, tool calling, and response generation
-- **📡 Event-Driven Streaming**: Real-time progress updates and response streaming with type-safe events
-- **🔧 MCP Integration**: Native support for the **Model Context Protocol** to discover and connect tools
-- **🎯 Multi-Provider Support**: OpenAI, Azure OpenAI, and extensible provider system
-- **⚡ Explicit Client Injection**: Full control over LLM clients for better testing and configuration
-- **📘 TypeScript First**: Full TypeScript support with type safety
+#### 🎒 Backpack: Git-Like State Management
+[📚 Documentation](./docs/v2.0/prds/PRD-001-backpack-architecture.md)
 
-### 🚧 Coming in v2.0 (December 21, 2025)
+Think of it as **"Git for your agent's memory"** - every data change is tracked with full history:
 
-**The Observable Agent Release** - Three foundational systems working together:
+- **Immutable History**: Every state change recorded like Git commits
+- **Time-Travel Debugging**: Rewind to any previous state to see what the agent "knew"
+- **Source Tracking**: Know exactly which node added/modified each piece of data
+- **Access Control**: Nodes declare what they can read/write with wildcard support
+- **State Quarantine**: Isolate failed operations from downstream nodes
 
-#### 🎒 [PRD-001: Backpack Architecture](./docs/v2.0/prds/PRD-001-backpack-architecture.md)
-- **Scoped State Management**: Nodes declare what they can read/write - no more "junk drawer" context
-- **Source Tracking**: Every piece of data carries metadata (who added it, when, why)
-- **Time-Travel Debugging**: Snapshot state at any point to see exactly what the agent "knew"
-- **State Sanitization**: Failed operations don't leak into downstream nodes
+```typescript
+// Git workflow           // Backpack workflow
+git commit              → backpack.pack('data', value)
+git log                 → backpack.getHistory()
+git checkout abc123     → backpack.getSnapshot('abc123')
+git diff                → backpack.diff(before, after)
+```
 
-#### 📡 [PRD-002: Standardized Telemetry](./docs/v2.0/prds/PRD-002-telemetry-system.md)
-- **Automatic Event Emission**: See lifecycle events (`NODE_START`, `PREP`, `EXEC`, `END`) without writing logging code
-- **Debug Prompts**: Inspect exact prompts sent to LLMs via `PREP_COMPLETE` events
-- **Parse Error Visibility**: See raw LLM responses before JSON parsing fails
-- **Flow Visualization**: Export events to build visual debuggers and tracers
+#### 📡 Event Streaming: Complete Observability
+[📚 Documentation](./docs/v2.0/prds/PRD-002-telemetry-system.md)
 
-#### 🔌 [PRD-003: Serialization Bridge](./docs/v2.0/prds/PRD-003-serialization-bridge.md)
-- **Config-Driven Nodes**: Instantiate flows from JSON (enables drag-and-drop UIs)
-- **Type-Safe Configs**: Zod-validated schemas prevent broken deployments
-- **Dependency Injection**: Handle non-serializable objects (LLM clients) cleanly
-- **A/B Testing**: Swap node configs dynamically without code changes
+Automatic event emission for every node lifecycle event - no manual logging needed:
+
+- **5 Event Types**: `NODE_START`, `PREP_COMPLETE`, `EXEC_COMPLETE`, `NODE_END`, `ERROR`
+- **Prompt Inspection**: See exact LLM prompts via `PREP_COMPLETE` events
+- **Parse Error Visibility**: Inspect raw responses before JSON parsing fails
+- **Namespace Filtering**: Subscribe to events with wildcard patterns
+- **Event History**: Built-in event storage for post-mortem debugging
+
+#### 🔌 Config-Driven Architecture
+[📚 Documentation](./docs/v2.0/prds/PRD-003-serialization-bridge.md)
+
+Bidirectional conversion between TypeScript code and JSON configs:
+
+- **JSON Serialization**: Export complete flows to JSON for storage/transfer
+- **Type-Safe Loading**: Zod-validated configs prevent runtime errors
+- **Dependency Injection**: Clean handling of non-serializable objects (LLM clients, DBs)
+- **Round-Trip Guarantee**: `fromConfig(toConfig())` preserves node identity
+- **UI-Ready**: Foundation for drag-and-drop flow builders
+
+#### 🔀 Nested Flows & Composition
+[📚 Documentation](./docs/v2.0/prds/PRD-004-composite-nodes.md)
+
+Build complex agents from reusable components with standard patterns:
+
+- **`createInternalFlow()`**: Auto-wiring of namespace, backpack, and events
+- **Recursive Serialization**: Complete nested structure in JSON
+- **Convenience Methods**: `.onComplete()`, `.onError()` instead of string-based routing
+- **FlowAction Enum**: Type-safe routing with standardized actions
+- **Query API**: `flattenNodes()`, `findNode()`, `getMaxDepth()` for flow introspection
+
+#### 🔍 Data Contracts & Type Safety
+[📚 Documentation](./docs/v2.0/prds/PRD-005-complete-flow-observability.md)
+
+Zod-powered input/output contracts for bulletproof type safety:
+
+- **Explicit Contracts**: Nodes declare expected inputs and outputs with Zod schemas
+- **Runtime Validation**: Automatic validation with detailed error messages
+- **Type Inference**: Full TypeScript types inferred from schemas
+- **Data Mappings**: Edge-level key remapping for flexible composition
+- **JSON Schema Export**: Generate schemas for UI form builders
 
 ## Project Structure
 
@@ -260,39 +296,129 @@ npm run build
 npm run dev
 ```
 
-## Learning & Examples
+## 🎓 Learning & Examples
 
-🎓 **New to BackpackFlow?** Start with our comprehensive tutorial series:
+### Featured Example: YouTube Research Agent
+**[tutorials/youtube-research-agent/](./tutorials/youtube-research-agent/)** - Production-ready agent showcasing all v2.0 features:
 
-- **[Simple Sales Agent](./tutorials/simple-sales-agent/)** - 🆕 Complete agent with tool integration and streaming (v1.2.0)
-- **[Building AI from First Principles](./tutorials/building-ai-from-first-principles/)** - Learn by building real AI applications
-- **[Part 1: Foundations](./tutorials/building-ai-from-first-principles/01-foundations/)** - From API calls to conversations
-- **[Simple Chatbot Tutorial](./tutorials/simple-chatbot/)** - Build your first AI chatbot
+```typescript
+class YouTubeResearchAgentNode extends BackpackNode {
+    async _exec(input: any) {
+        // ✨ Create internal flow with auto-wiring
+        const flow = this.createInternalFlow();
+        
+        const searchNode = flow.addNode(YouTubeSearchNode, { id: 'search' });
+        const analysisNode = flow.addNode(DataAnalysisNode, { id: 'analysis' });
+        const summaryNode = flow.addNode(BaseChatCompletionNode, { id: 'summary' });
+        
+        // ✨ Clean routing with convenience methods
+        searchNode.onComplete(analysisNode);
+        analysisNode.onComplete(summaryNode);
+        
+        await flow.run({});
+    }
+}
+```
 
-### Advanced Examples
-- **[PocketFlow Cookbook](./tutorials/pocketflow-cookbook-ts/)** - Advanced patterns and workflows
+**Features demonstrated:**
+- 🔀 Composite nodes with nested flows
+- ✅ Zod-based data contracts with type inference
+- 📡 Event streaming with hierarchical visualization
+- 💾 Complete flow serialization to JSON
+- 🎯 Channel-relative outlier detection algorithm
 
-See the `tutorials/` directory for complete learning guides and usage examples.
+### Additional Tutorials
+
+**Advanced Patterns:**
+- **[PocketFlow Cookbook](./tutorials/pocketflow-cookbook-ts/)** - Advanced workflow patterns
+
+**Legacy Examples (v1.x):**
+- [Simple Sales Agent](./tutorials/simple-sales-agent/) - Tool integration and streaming
+- [Building AI from First Principles](./tutorials/building-ai-from-first-principles/) - Foundational concepts
+- [Simple Chatbot](./tutorials/simple-chatbot/) - Basic chatbot implementation
+
+See the `tutorials/` directory for all examples.
 
 ## 📋 What's New
 
-### v1.2.0 (Latest) - Event-Driven Architecture + Explicit Client Injection
-- ✅ **Explicit LLM Client Injection**: Full control over LLM clients for better testing and configuration
-- ✅ **Enhanced Event Streaming**: Type-safe `StreamEventType` enum for better event handling
-- ✅ **Azure OpenAI Support**: Native support for Azure OpenAI endpoints
-- ✅ **Improved AgentNode**: Simplified configuration with better defaults
-- ✅ **Better Error Handling**: Enhanced error reporting and debugging
-- ✅ **Code Cleanup**: Removed console.log statements in favor of event emissions
+### v2.0.0 "The Observable Agent" (Current)
 
-### v1.1.0 - Event-Driven Streaming
-- ✅ **EventStreamer**: Centralized event management with namespace support
-- ✅ **Real-time Streaming**: Live progress updates and response streaming
-- ✅ **AgentNode**: High-level agent orchestration with tool integration
+**Major architectural rewrite** with production-grade observability and type safety.
 
-### v1.0.x - Initial Release
-- ✅ **Core Framework**: Basic PocketFlow integration and node system
-- ✅ **LLM Providers**: OpenAI integration and provider abstraction
-- ✅ **Basic Nodes**: Chat, Decision, and utility nodes
+#### 🎯 Core Systems
+
+**Backpack Architecture**
+- Git-like state management with immutable commit history
+- Time-travel debugging with state snapshots
+- Fine-grained access control with namespace wildcards
+- State quarantine for isolating failed operations
+
+**Event Streaming**
+- 5 standardized event types for complete lifecycle visibility
+- Automatic emission - zero manual logging required
+- Namespace-based filtering with wildcard support
+- Built-in event history for debugging
+
+**Config-Driven Serialization**
+- Bidirectional TypeScript ↔ JSON conversion
+- Zod-powered validation for type safety
+- Dependency injection for non-serializable objects
+- Round-trip guarantee for config preservation
+
+**Nested Flows & Composition**
+- `createInternalFlow()` with automatic context inheritance
+- Recursive serialization for complete flow structure
+- `.onComplete()` / `.onError()` convenience methods
+- Query utilities for flow introspection
+
+**Zod Data Contracts**
+- Explicit input/output declarations on nodes
+- Runtime validation with detailed error messages
+- Full TypeScript type inference
+- Edge-level data mappings for key remapping
+
+#### 🔧 Developer Experience
+
+- **Type Safety**: End-to-end TypeScript with Zod schema validation
+- **Observability**: See everything - prompts, responses, state changes, errors
+- **Debugging**: Time-travel to any point in execution history
+- **Composition**: Build complex agents from simple, reusable nodes
+- **UI-Ready**: Complete serialization for visual flow builders
+
+#### 📖 Resources
+
+- [Migration Guide from v1.x](./docs/v2.0/migration/MIGRATION-v1-to-v2.md)
+- [v2.0 Completion Summary](./docs/v2.0/V2.0-COMPLETION-SUMMARY.md)
+- [Full PRD Documentation](./docs/v2.0/prds/)
+
+---
+
+### Previous Versions
+
+<details>
+<summary><b>v1.2.0</b> - Event-Driven Architecture (Legacy)</summary>
+
+- Explicit LLM client injection
+- Enhanced event streaming with `StreamEventType` enum
+- Azure OpenAI support
+- Improved `AgentNode` with better defaults
+</details>
+
+<details>
+<summary><b>v1.1.0</b> - Event-Driven Streaming (Legacy)</summary>
+
+- `EventStreamer` for centralized event management
+- Real-time streaming support
+- High-level `AgentNode` orchestration
+</details>
+
+<details>
+<summary><b>v1.0.x</b> - Initial Release (Legacy)</summary>
+
+- Basic PocketFlow integration
+- OpenAI provider integration
+- Core node types (Chat, Decision, utilities)
+</details>
 
 ## 🤝 Join the Community
 

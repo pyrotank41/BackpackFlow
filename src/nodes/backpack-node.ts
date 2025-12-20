@@ -17,6 +17,8 @@
 import { BaseNode } from '../pocketflow';
 import { Backpack } from '../storage/backpack';
 import { PackOptions } from '../storage/types';
+import { DataContract, ContractValidationError } from '../serialization/types';
+import type { Flow } from '../flows/flow';  // Forward reference to avoid circular dependency
 
 /**
  * Context passed to BackpackNode during instantiation
@@ -64,6 +66,37 @@ export class BackpackNode<S = any> extends BaseNode<S> {
     static namespaceSegment?: string;
     
     /**
+     * Input data contract (PRD-005 Issue #3)
+     * 
+     * Declares what data this node expects from the Backpack
+     * Enables runtime validation and UI auto-completion
+     * 
+     * Example:
+     * ```typescript
+     * static inputs: DataContract = {
+     *     userQuery: { type: 'string', required: true, description: 'User question' },
+     *     context: { type: 'object', required: false }
+     * };
+     * ```
+     */
+    static inputs?: DataContract;
+    
+    /**
+     * Output data contract (PRD-005 Issue #3)
+     * 
+     * Declares what data this node writes to the Backpack
+     * Enables UI visualization and data flow analysis
+     * 
+     * Example:
+     * ```typescript
+     * static outputs: DataContract = {
+     *     chatResponse: { type: 'string', required: true, description: 'LLM response' }
+     * };
+     * ```
+     */
+    static outputs?: DataContract;
+    
+    /**
      * Node ID (unique within the flow)
      */
     public readonly id: string;
@@ -86,6 +119,25 @@ export class BackpackNode<S = any> extends BaseNode<S> {
     protected readonly eventStreamer?: any;
     
     /**
+     * Internal flow for composite nodes (PRD-004)
+     * 
+     * Allows nodes to contain nested flows for composition patterns.
+     * Created via `createInternalFlow()` helper.
+     */
+    private _internalFlow?: Flow;
+    
+    /**
+     * Get internal flow (if this is a composite node)
+     * 
+     * Used by FlowLoader for serialization and UI for visualization.
+     * 
+     * @returns Internal flow instance or undefined for simple nodes
+     */
+    get internalFlow(): Flow | undefined {
+        return this._internalFlow;
+    }
+    
+    /**
      * Constructor - called by Flow during node instantiation
      * 
      * @param config - Node configuration (id + node-specific options)
@@ -98,6 +150,112 @@ export class BackpackNode<S = any> extends BaseNode<S> {
         this.namespace = context.namespace;
         this.backpack = context.backpack;
         this.eventStreamer = context.eventStreamer;
+    }
+    
+    /**
+     * Create an internal flow with proper inheritance (PRD-004)
+     * 
+     * Use this method in composite nodes to build nested flows.
+     * The internal flow automatically inherits:
+     * - Namespace (parent node's namespace)
+     * - Backpack (shared state)
+     * - EventStreamer (telemetry)
+     * 
+     * @returns Flow instance with inherited context
+     * @throws Error if called more than once (flows are immutable after creation)
+     * 
+     * @example
+     * ```typescript
+     * class AgentNode extends BackpackNode {
+     *     async _exec(input: any) {
+     *         const flow = this.createInternalFlow();
+     *         
+     *         const search = flow.addNode(SearchNode, { id: 'search' });
+     *         const analyze = flow.addNode(AnalyzeNode, { id: 'analyze' });
+     *         
+     *         search.onComplete(analyze);
+     *         
+     *         flow.setEntryNode(search);
+     *         await flow.run(input);
+     *     }
+     * }
+     * ```
+     */
+    protected createInternalFlow(): Flow {
+        if (this._internalFlow) {
+            throw new Error(
+                `Internal flow already exists for node '${this.id}'. ` +
+                `Call createInternalFlow() only once (flows are immutable after creation).`
+            );
+        }
+        
+        // Dynamically import Flow to avoid circular dependency
+        const { Flow } = require('../flows/flow');
+        
+        const flow = new Flow({
+            namespace: this.namespace,
+            backpack: this.backpack,
+            eventStreamer: this.eventStreamer
+        });
+        
+        this._internalFlow = flow;
+        return flow;
+    }
+    
+    /**
+     * Check if this node has an internal flow
+     * 
+     * @returns True if node contains nested flow, false otherwise
+     */
+    isComposite(): boolean {
+        return this._internalFlow !== undefined;
+    }
+    
+    /**
+     * Validate input contracts using Zod (PRD-005 Issue #3 - Zod Implementation)
+     * 
+     * Validates all inputs against their Zod schemas:
+     * - Type checking (string, number, boolean, array, object)
+     * - Required vs optional fields
+     * - Nested object validation
+     * - Array element validation
+     * - Custom constraints (min, max, regex, etc.)
+     * 
+     * @throws ContractValidationError if validation fails with detailed error paths
+     */
+    protected validateInputs(contracts: DataContract): void {
+        const violations: Array<{ key: string; errors: string[] }> = [];
+        
+        for (const [key, schema] of Object.entries(contracts)) {
+            const value = this.backpack.unpack(key, this.id);
+            
+            // Validate with Zod
+            const result = schema.safeParse(value);
+            
+            if (!result.success) {
+                // Collect all validation errors with paths
+                const errors = result.error.issues.map(issue => {
+                    const path = issue.path.length > 0 
+                        ? `${issue.path.join('.')}: ` 
+                        : '';
+                    return `${path}${issue.message}`;
+                });
+                violations.push({ key, errors });
+            }
+        }
+        
+        if (violations.length > 0) {
+            // Format detailed error message
+            const violationDetails = violations
+                .map(v => `  - ${v.key}:\n${v.errors.map(e => `      ${e}`).join('\n')}`)
+                .join('\n');
+            
+            throw new ContractValidationError(
+                `Node '${this.id}' (${this.constructor.name}) input validation failed:\n${violationDetails}`,
+                this.id,
+                violations
+            );
+        }
     }
     
     /**
@@ -154,6 +312,12 @@ export class BackpackNode<S = any> extends BaseNode<S> {
         try {
             // PRD-002: Emit NODE_START event
             this.emitNodeStart(shared);
+            
+            // PRD-005: Validate input contracts (if defined)
+            const constructor = this.constructor as typeof BackpackNode;
+            if (constructor.inputs) {
+                this.validateInputs(constructor.inputs);
+            }
             
             // Run prep phase
             const prepStartTime = Date.now();

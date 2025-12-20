@@ -1,6 +1,6 @@
 # Documentation Structure
 
-**Last Updated:** December 18, 2025
+**Last Updated:** December 20, 2025
 
 This document visualizes the complete documentation structure for BackpackFlow.
 
@@ -14,13 +14,16 @@ docs/
 ├── README.md                       # Main documentation hub
 ├── STRUCTURE.md                    # This file
 │
-├── v2.0/                          # 🚧 Current Development (Dec 21, 2025)
+├── v2.0/                          # ✅ Current Development (Dec 21, 2025)
 │   ├── README.md                   # v2.0 documentation index
 │   │
 │   ├── prds/                       # Product Requirements Documents
-│   │   ├── PRD-001-backpack-architecture.md
-│   │   ├── PRD-002-telemetry-system.md
-│   │   └── PRD-003-serialization-bridge.md
+│   │   ├── PRD-001-backpack-architecture.md           # ✅ Complete
+│   │   ├── PRD-002-telemetry-system.md                # ✅ Complete
+│   │   ├── PRD-003-serialization-bridge.md            # ✅ Complete
+│   │   ├── PRD-004-composite-nodes.md                 # ✅ Complete
+│   │   ├── PRD-005-complete-flow-observability.md     # ✅ Complete
+│   │   └── PRD-006-documentation-developer-experience.md  # 📋 Planned v2.1
 │   │
 │   ├── specs/                      # Technical Specifications
 │   │   ├── DECISIONS-AUDIT-v2.0.md          # ⭐ START HERE
@@ -52,12 +55,12 @@ docs/
 
 | Category | v2.0 | v2.1 | Legacy | Total |
 |----------|------|------|--------|-------|
-| **PRDs** | 3 | 0 | 1 | 4 |
+| **PRDs** | 6 | 0 | 1 | 7 |
 | **Tech Specs** | 2 | 0 | 0 | 2 |
 | **Guides** | 6 | 0 | 0 | 6 |
 | **Migration** | 2 | 0 | 0 | 2 |
 | **READMEs** | 1 | 1 | 1 | 3 |
-| **Total** | 14 | 1 | 2 | **17** |
+| **Total** | 17 | 1 | 2 | **20** |
 
 ---
 

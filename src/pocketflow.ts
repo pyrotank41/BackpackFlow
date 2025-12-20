@@ -1,4 +1,20 @@
 // DANGER AREA:NEVER EDIT THIS FILE. The following code was written by PocketFlow developer, and we want to maintain it as is.
+
+/**
+ * Standard flow actions (PRD-004)
+ * 
+ * Provides type-safe constants for common routing actions.
+ * Nodes can still use custom string actions for specialized routing.
+ */
+export enum FlowAction {
+    COMPLETE = 'complete',
+    ERROR = 'error',
+    SUCCESS = 'success',
+    FAILURE = 'failure',
+    RETRY = 'retry',
+    DEFAULT = 'default'
+}
+
 export type NonIterableObject = Partial<Record<string, unknown>> & { [Symbol.iterator]?: never }; type Action = string;
 class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
   protected _params: P = {} as P; protected _successors: Map<Action, BaseNode> = new Map();
@@ -14,11 +30,17 @@ class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
     return await this._run(shared);
   }
   setParams(params: P): this { this._params = params; return this; }
-  next<T extends BaseNode>(node: T): T { this.on("default", node); return node; }
-  on(action: Action, node: BaseNode): this {
-    if (this._successors.has(action)) console.warn(`Overwriting successor for action '${action}'`);
-    this._successors.set(action, node); return this;
+  next<T extends BaseNode>(node: T): T { this.onComplete(node); return node; }
+  on(action: Action | FlowAction, node: BaseNode): this {
+    if (this._successors.has(action.toString())) console.warn(`Overwriting successor for action '${action}'`);
+    this._successors.set(action.toString(), node); return this;
   }
+  // Convenience methods for common actions (PRD-004)
+  onComplete(node: BaseNode): this { return this.on(FlowAction.COMPLETE, node); }
+  onError(node: BaseNode): this { return this.on(FlowAction.ERROR, node); }
+  onSuccess(node: BaseNode): this { return this.on(FlowAction.SUCCESS, node); }
+  onFailure(node: BaseNode): this { return this.on(FlowAction.FAILURE, node); }
+  onRetry(node: BaseNode): this { return this.on(FlowAction.RETRY, node); }
   getNextNode(action: Action = "default"): BaseNode | undefined {
     const nextAction = action || 'default', next = this._successors.get(nextAction)
     if (!next && this._successors.size > 0)

@@ -1,10 +1,10 @@
 # PRD-003: Serialization Bridge (Config-Driven Nodes)
 
-**Status:** Draft  
+**Status:** Complete  
 **Priority:** P1 (Enabler for Low-Code)  
 **Target Release:** v2.0.0  
 **Dependencies:** PRD-001 (Backpack), PRD-002 (Telemetry)  
-**Blocks:** Future Web GUI
+**Blocks:** PRD-005 (Complete Flow Observability)
 
 ---
 
@@ -704,5 +704,5 @@ All configs MUST pass Zod validation before instantiation. Reject invalid config
 **References:**
 - Master File Section 2.C: "Implementation Goals (Immediate)"
 - Original PRD Section 2.3: "Serialization (The Bridge)"
-- Related: PRD-001 (Backpack must be serializable), PRD-002 (EventStreamer in config)
+- Related: PRD-001 (Backpack must be serializable), PRD-002 (EventStreamer in config), **PRD-005 (Complete Flow Observability)**
 
