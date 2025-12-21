@@ -1,98 +1,25 @@
-name: Publish to npm
+name: Publish Package
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    
-    permissions:
-      contents: read
-      id-token: write # Required for npm provenance
-    
     steps:
-      # 1. Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      # 2. Setup Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-      
-      # 3. Install dependencies
-      - name: Install dependencies
-        run: npm ci
-      
-      # 4. Run tests (ALL 237 tests must pass!)
-      - name: Run tests
-        run: npm test
-      
-      # 5. Build the package
-      - name: Build package
-        run: npm run build
-      
-      # 6. Validate version matches release tag
-      - name: Validate version
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          RELEASE_TAG=${GITHUB_REF#refs/tags/}
-          
-          # Remove 'v' prefix if present (v2.0.0 → 2.0.0)
-          RELEASE_VERSION=${RELEASE_TAG#v}
-          
-          echo "Package version: $PACKAGE_VERSION"
-          echo "Release version: $RELEASE_VERSION"
-          
-          if [ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]; then
-            echo "❌ ERROR: Version mismatch!"
-            echo "package.json version ($PACKAGE_VERSION) does not match release tag ($RELEASE_VERSION)"
-            exit 1
-          fi
-          
-          echo "✅ Version validation passed!"
-      
-      # 7. Verify build output exists
-      - name: Verify build output
-        run: |
-          if [ ! -f "dist/index.js" ]; then
-            echo "❌ ERROR: dist/index.js not found!"
-            exit 1
-          fi
-          
-          if [ ! -f "dist/index.d.ts" ]; then
-            echo "❌ ERROR: dist/index.d.ts not found!"
-            exit 1
-          fi
-          
-          echo "✅ Build output verified!"
-      
-      # 8. Check if version already published (safety check)
-      - name: Check if version already published
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          
-          # Check npm registry
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-            echo "⚠️  WARNING: Version $PACKAGE_VERSION is already published to npm!"
-            echo "This might be a re-release. Proceeding anyway..."
-          else
-            echo "✅ Version $PACKAGE_VERSION is new. Ready to publish!"
-          fi
-      
-      # 9. Publish to npm (using Trusted Publishing via OIDC)
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-      
-      # 10. Success message
-      - name: Success notification
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          echo "🎉 Successfully published backpackflow@$PACKAGE_VERSION to npm!"
-          echo "📦 View package: https://www.npmjs.com/package/backpackflow"
+      - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run build --if-present
+      - run: npm test
+      - run: npm publish
