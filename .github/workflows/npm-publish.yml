@@ -85,11 +85,9 @@ jobs:
             echo "✅ Version $PACKAGE_VERSION is new. Ready to publish!"
           fi
       
-      # 9. Publish to npm
+      # 9. Publish to npm (using Trusted Publishing via OIDC)
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       
       # 10. Success message
       - name: Success notification
