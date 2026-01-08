@@ -62,16 +62,27 @@ export class EventStreamer {
             this.addToHistory(event);
         }
 
+        const listenerCount = this.emitter.listenerCount(type) + this.emitter.listenerCount('*');
+        console.log(`[EventStreamer] Emitting ${type} from ${metadata.sourceNode} (${metadata.nodeId}). Listeners: ${listenerCount}`);
+
         // Emit to listeners
         if (this.syncEmission) {
             // Synchronous emission
-            this.emitter.emit(type, event);
-            this.emitter.emit('*', event); // Wildcard
+            try {
+                this.emitter.emit(type, event);
+                this.emitter.emit('*', event); // Wildcard
+            } catch (err) {
+                console.error(`[EventStreamer] Error emitting event ${type}:`, err);
+            }
         } else {
             // Asynchronous (fire-and-forget)
             setImmediate(() => {
-                this.emitter.emit(type, event);
-                this.emitter.emit('*', event);
+                try {
+                    this.emitter.emit(type, event);
+                    this.emitter.emit('*', event);
+                } catch (err) {
+                    console.error(`[EventStreamer] Error emitting event ${type} (async):`, err);
+                }
             });
         }
     }

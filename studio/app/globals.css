@@ -127,12 +127,8 @@
 }
 
 /* React Flow Theme Override */
-.react-flow {
-  background-color: var(--background) !important;
-}
-
-.react-flow__viewport {
-  background-color: var(--background) !important;
+.react-flow, .react-flow__viewport {
+  background-color: transparent !important;
 }
 
 .react-flow__background {

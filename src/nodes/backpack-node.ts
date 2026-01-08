@@ -189,7 +189,7 @@ export class BackpackNode<S = any> extends BaseNode<S> {
      * @param config - Node configuration (id + node-specific options)
      * @param context - Execution context (namespace + backpack)
      */
-    constructor(config: NodeConfig, context: NodeContext) {
+    constructor(config: any, context: NodeContext) {
         super();
         
         this.id = config.id;
@@ -201,9 +201,13 @@ export class BackpackNode<S = any> extends BaseNode<S> {
         this.credentialResolver = new CredentialResolver(context.credentialManager);
         
         // Auto-validate config against schema (if defined)
+        // Normalize config for validation: merge params if they exist
         const constructor = this.constructor as typeof BackpackNode;
         if (constructor.config) {
-            this.validateConfig(config, constructor.config);
+            const normalizedConfig = config.params 
+                ? { ...config.params, id: config.id }
+                : config;
+            this.validateConfig(normalizedConfig, constructor.config);
         }
     }
     

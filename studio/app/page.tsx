@@ -73,6 +73,12 @@ export default function HomePage() {
               AI Agent Workshop
             </p>
             <div className="w-px h-5 bg-border" />
+            <Link href="/credentials">
+              <span className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                Keys
+              </span>
+            </Link>
+            <div className="w-px h-5 bg-border" />
             <ThemeSwitcher />
           </div>
         </div>

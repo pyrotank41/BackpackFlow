@@ -65,7 +65,7 @@ export class YouTubeSearchNode extends BackpackNode {
      */
     static config = z.object({
         apiKey: z.string()
-            .min(1)
+            .optional()
             .describe('YouTube Data API v3 key'),
         maxResults: z.number()
             .min(1)
@@ -81,9 +81,10 @@ export class YouTubeSearchNode extends BackpackNode {
         searchQuery: z.string()
             .min(1)
             .describe('YouTube search query (e.g., "AI productivity tools")'),
-        publishedAfter: z.date()
-            .optional()
-            .describe('Filter videos published after this date')
+        publishedAfter: z.preprocess(
+            (val) => (val === null || val === '' ? undefined : val),
+            z.coerce.date().optional()
+        ).describe('Filter videos published after this date')
     };
     
     /**
@@ -107,13 +108,9 @@ export class YouTubeSearchNode extends BackpackNode {
     constructor(config: any, context: NodeContext) {
         super(config, context);
         
-        // Store credential reference (will be resolved at runtime)
-        this.apiKeyRef = config.apiKey || process.env.YOUTUBE_API_KEY || '';
-        this.maxResults = config.maxResults ?? 50;
-        
-        if (!this.apiKeyRef) {
-            throw new Error('YouTube API key is required. Set YOUTUBE_API_KEY env var or pass in config.');
-        }
+        const params = config.params || config;
+        this.apiKeyRef = params.apiKey || process.env.YOUTUBE_API_KEY || '';
+        this.maxResults = params.maxResults ?? 50;
     }
     
     /**

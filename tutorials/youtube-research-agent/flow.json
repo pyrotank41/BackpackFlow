@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "namespace": "youtube-research",
+  "nodes": [
+    {
+      "id": "query-planner",
+      "type": "BaseChatCompletionNode",
+      "params": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.3,
+        "jsonResponse": true,
+        "systemPrompt": "You are a YouTube search query optimizer. Extract search terms and parameters from user requests. Return JSON with: searchQuery (string), maxResults (number), publishedAfter (ISO date or null)."
+      }
+    },
+    {
+      "id": "youtube-search",
+      "type": "YouTubeSearchNode",
+      "params": {
+        "maxResults": 10
+      }
+    },
+    {
+      "id": "data-analysis",
+      "type": "DataAnalysisNode",
+      "params": {
+        "metric": "views",
+        "threshold": 2.0
+      }
+    },
+    {
+      "id": "response-generator",
+      "type": "BaseChatCompletionNode",
+      "params": {
+        "model": "gpt-4o",
+        "temperature": 0.7,
+        "systemPrompt": "You are a helpful YouTube research assistant. Summarize video findings in a clear, engaging way. Include titles, channels, and why each video is recommended based on its breakthrough performance."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "query-planner",
+      "to": "youtube-search",
+      "condition": "complete"
+    },
+    {
+      "from": "youtube-search",
+      "to": "data-analysis",
+      "condition": "complete"
+    },
+    {
+      "from": "data-analysis",
+      "to": "response-generator",
+      "condition": "complete"
+    }
+  ],
+  "entryNodeId": "query-planner"
+}

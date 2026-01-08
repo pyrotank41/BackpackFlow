@@ -79,9 +79,11 @@ export async function discoverAgents(dir: string = '../tutorials'): Promise<Agen
       if (isChatCompatible(metadata)) {
         // Add internal metadata
         metadata._path = folder;
-        metadata._type = fs.existsSync(path.join(tutorialsPath, folder, 'index.ts')) 
-          ? 'typescript' 
-          : 'json';
+        const hasFlowJson = fs.existsSync(path.join(tutorialsPath, folder, 'flow.json'));
+        const hasIndexTs = fs.existsSync(path.join(tutorialsPath, folder, 'index.ts')) || 
+                           fs.existsSync(path.join(tutorialsPath, folder, `${folder}.ts`));
+        
+        metadata._type = hasFlowJson ? 'json' : (hasIndexTs ? 'typescript' : 'typescript');
         
         agents.push(metadata);
         console.log(`[Agent Discovery] ✓ Found chat-compatible agent: ${metadata.id}`);

@@ -51,6 +51,9 @@ export interface NodeConfig {
     inputs?: Record<string, any>;      // Input contract as JSON Schema (PRD-005)
     outputs?: Record<string, any>;     // Output contract as JSON Schema (PRD-005)
     internalFlow?: FlowConfig;         // Nested flow for composite nodes (PRD-004)
+    backpack?: any;                    // Runtime: Backpack instance
+    eventStreamer?: any;               // Runtime: Event streamer
+    credentialManager?: any;           // Runtime: Credential manager
 }
 
 /**
@@ -90,6 +93,9 @@ export interface FlowConfig {
     edges: FlowEdge[];                 // Edge configurations
     entryNodeId?: string;              // ID of the entry node
     dependencies?: DependencyManifest; // Dependency metadata
+    backpack?: any;                    // Runtime: Backpack instance
+    eventStreamer?: any;               // Runtime: Event streamer
+    credentialManager?: any;           // Runtime: Credential manager
 }
 
 /**

@@ -20,7 +20,7 @@ export default function NodePropertyPanel({
     const { metadata, nodeType, nodeParams, label } = nodeData;
 
     return (
-        <div className="h-full flex flex-col bg-background border-l border-border">
+        <div className="h-full flex flex-col bg-background/20 backdrop-blur-3xl border-l border-border">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
                 <div className="flex items-center gap-2">

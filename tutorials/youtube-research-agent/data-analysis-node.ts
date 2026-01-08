@@ -99,9 +99,9 @@ export class DataAnalysisNode extends BackpackNode {
     constructor(config: any, context: NodeContext) {
         super(config, context);
         
-        // Extract validated config
-        this.metric = config.metric ?? 'views';
-        this.threshold = config.threshold ?? 10;
+        const params = config.params || config;
+        this.metric = params.metric || 'views';
+        this.threshold = params.threshold ?? 10;
     }
     
     /**
@@ -340,7 +340,8 @@ export class DataAnalysisNode extends BackpackNode {
         
         // Return action based on results
         if (output.outliers.length === 0) {
-            return 'no_outliers';
+            this.pack('prompt', 'No breakthrough videos were found for this query using channel-relative analysis. Summarize the general findings and explain what search parameters might be adjusted to find outliers.');
+            return 'complete';
         }
         
         // Create prompt for LLM to explain why these videos are outliers

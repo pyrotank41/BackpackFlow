@@ -4,9 +4,13 @@
  * Loads agent node classes from the registry and creates flows with Backpack.
  */
 
-import { BackpackFlow, Backpack, FlowLoader, EventStreamer } from 'backpackflow';
+import { BackpackFlow, Backpack, FlowLoader, EventStreamer, DependencyContainer } from 'backpackflow';
+import { NodeRegistry } from '@backpackflow/nodes/registry';
 import type { AgentMetadata } from './agent-discovery';
 import { getAgentNodeClass } from './agent-registry';
+import * as fs from 'fs';
+import * as path from 'path';
+import { registerYouTubeAgentNodes } from '@tutorials/youtube-research-agent/register-nodes';
 
 /**
  * Load and instantiate agent with Backpack
@@ -17,6 +21,40 @@ export async function loadAgent(
   eventStreamer?: EventStreamer
 ): Promise<BackpackFlow> {
   try {
+    // Ensure nodes are registered for the loader
+    registerYouTubeAgentNodes();
+
+    if (metadata._type === 'json' && metadata._path) {
+      console.log(`[Agent Loader] Loading JSON-defined agent: ${metadata.id}`);
+      
+      const tutorialsPath = path.resolve(process.cwd(), '../tutorials');
+      const flowPath = path.join(tutorialsPath, metadata._path, 'flow.json');
+      
+      if (!fs.existsSync(flowPath)) {
+        throw new Error(`Flow config not found at ${flowPath}`);
+      }
+      
+      const config = JSON.parse(fs.readFileSync(flowPath, 'utf8'));
+      
+      const loader = new FlowLoader();
+      // Register all available nodes to the loader
+      const nodeTypes = NodeRegistry.getTypes();
+      for (const type of nodeTypes) {
+        loader.register(type, NodeRegistry.get(type) as any);
+      }
+      
+      const deps = new DependencyContainer();
+      deps.register('backpack', backpack);
+      if (eventStreamer) {
+        deps.register('eventStreamer', eventStreamer);
+      }
+      
+      const flow = await loader.loadFlow(config, deps);
+      console.log(`[Agent Loader] ✓ Loaded JSON agent: ${metadata.id}`);
+      return flow as any;
+    }
+
+    // Fallback: Legacy TypeScript composite nodes
     const NodeClass = getAgentNodeClass(metadata.id);
     
     const flow = new BackpackFlow({
@@ -31,7 +69,7 @@ export async function loadAgent(
     
     flow.setEntryNode(agentNode);
     
-    console.log(`[Agent Loader] ✓ Loaded agent: ${metadata.id}`);
+    console.log(`[Agent Loader] ✓ Loaded TS agent: ${metadata.id}`);
     return flow;
   } catch (error) {
     console.error(`[Agent Loader] Failed to load agent ${metadata.id}:`, error);

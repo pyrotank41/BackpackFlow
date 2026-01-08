@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Monitor, Moon, Sun, Settings } from "lucide-react";
+import { Monitor, Moon, Sun, Settings, Key } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "./theme-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import {
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
 
   return (
     <DropdownMenu>
@@ -53,6 +55,14 @@ export function ThemeSwitcher() {
         >
           <Monitor className="mr-2 h-4 w-4" />
           <span>System</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
+          Settings
+        </DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => router.push('/credentials')}>
+          <Key className="mr-2 h-4 w-4" />
+          <span>Credential Manager</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -267,11 +267,18 @@ export class Flow<S = any> {
             // Get next node based on action
             if (action) {
                 const nextNode = currentNode.getNextNode(action);
-                // Only continue if next node is a BackpackNode
-                if (nextNode instanceof BackpackNode) {
-                    currentNode = nextNode;
+                console.log(`[Flow] Node '${currentNode.id}' returned action '${action}'. Next node: ${nextNode ? nextNode.constructor.name + ' (id: ' + (nextNode as any).id + ')' : 'NONE'}`);
+                
+                // Only continue if next node is a BackpackNode (or looks like one)
+                // Use duck typing to handle potential module duplication issues
+                const isBackpackNode = nextNode instanceof BackpackNode || 
+                                     (nextNode && typeof (nextNode as any)._run === 'function' && (nextNode as any).id);
+                
+                if (isBackpackNode) {
+                    currentNode = nextNode as BackpackNode;
                 } else if (nextNode) {
-                    console.warn('Next node is not a BackpackNode, ending flow');
+                    console.warn(`[Flow] Next node '${(nextNode as any).id}' (${nextNode.constructor.name}) is not a BackpackNode, ending flow`);
+                    console.log(`[Flow] Debug: typeof nextNode._run = ${typeof (nextNode as any)._run}, nextNode.id = ${(nextNode as any).id}`);
                     break;
                 } else {
                     currentNode = undefined;

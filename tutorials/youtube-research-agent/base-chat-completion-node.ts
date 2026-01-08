@@ -75,7 +75,10 @@ export class BaseChatCompletionNode extends BackpackNode {
             .describe('System prompt to set the LLM behavior'),
         apiKey: z.string()
             .optional()
-            .describe('OpenAI API key (or use OPENAI_API_KEY env var)')
+            .describe('OpenAI API key (or use OPENAI_API_KEY env var)'),
+        jsonResponse: z.boolean()
+            .default(false)
+            .describe('If true, the LLM will return a JSON object')
     });
     
     /**
@@ -107,19 +110,23 @@ export class BaseChatCompletionNode extends BackpackNode {
     private temperature!: number;
     private maxTokens!: number;
     private systemPrompt?: string;
-    private apiKeyRef?: string; // Store credential reference, not the actual key
+    private apiKeyRef?: string;
+    private jsonResponse: boolean;
     
     constructor(config: any, context: NodeContext) {
         super(config, context);
         
+        const params = config.params || config;
+        
         // Extract validated config
-        this.model = config.model ?? 'gpt-4o-mini';
-        this.temperature = config.temperature ?? 0.7;
-        this.maxTokens = config.maxTokens ?? 4000;
-        this.systemPrompt = config.systemPrompt;
+        this.model = params.model ?? 'gpt-4o-mini';
+        this.temperature = params.temperature ?? 0.7;
+        this.maxTokens = params.maxTokens ?? 4000;
+        this.systemPrompt = params.systemPrompt;
         
         // Store API key reference (will be resolved at runtime)
-        this.apiKeyRef = config.apiKey || process.env.OPENAI_API_KEY;
+        this.apiKeyRef = params.apiKey || process.env.OPENAI_API_KEY;
+        this.jsonResponse = params.jsonResponse ?? false;
     }
     
     /**
@@ -134,7 +141,8 @@ export class BaseChatCompletionNode extends BackpackNode {
                 temperature: this.temperature,
                 maxTokens: this.maxTokens,
                 systemPrompt: this.systemPrompt,
-                apiKey: '***' // Don't expose API key
+                apiKey: '***',
+                jsonResponse: this.jsonResponse
             }
         };
     }
@@ -153,11 +161,20 @@ export class BaseChatCompletionNode extends BackpackNode {
             apiKey: apiKey || process.env.OPENAI_API_KEY
         });
         
-        return {
+        const result = {
             prompt: this.unpackRequired<string>('prompt'),
-            context: this.unpack<string>('context'),
-            client // Pass client to exec
+            context: this.unpack<string>('context')
         };
+
+        // Make client non-enumerable to avoid circular JSON error in telemetry
+        Object.defineProperty(result, 'client', {
+            value: client,
+            enumerable: false,
+            writable: true,
+            configurable: true
+        });
+
+        return result;
     }
     
     /**
@@ -195,7 +212,8 @@ export class BaseChatCompletionNode extends BackpackNode {
                 model: this.model,
                 messages,
                 temperature: this.temperature,
-                max_tokens: this.maxTokens
+                max_tokens: this.maxTokens,
+                response_format: this.jsonResponse ? { type: 'json_object' } : undefined
             });
             
             const response = completion.choices[0]?.message?.content || '';
@@ -218,8 +236,22 @@ export class BaseChatCompletionNode extends BackpackNode {
      * Post-processing phase: Store response in backpack
      */
     async post(backpack: any, shared: any, output: any): Promise<string | undefined> {
-        // Pack the response
+        // Pack the raw response
         this.pack('chatResponse', output.response);
+        
+        // If JSON response is enabled, try to parse and pack individual keys
+        if (this.jsonResponse) {
+            try {
+                const parsed = JSON.parse(output.response);
+                if (parsed && typeof parsed === 'object') {
+                    for (const [key, value] of Object.entries(parsed)) {
+                        this.pack(key, value);
+                    }
+                }
+            } catch (err) {
+                console.warn(`[BaseChatCompletionNode] Failed to parse JSON response:`, err);
+            }
+        }
         
         // Pack usage info if available
         if (output.usage) {

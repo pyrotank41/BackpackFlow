@@ -9,14 +9,14 @@
     {
       "type": "chat",
       "inputType": "text",
-      "inputKey": "query",
+      "inputKey": "prompt",
       "description": "User provides a YouTube search query (e.g., 'AI productivity tools')"
     }
   ],
   
   "outputs": {
     "chat": {
-      "outputKey": "analysis",
+      "outputKey": "chatResponse",
       "format": "markdown",
       "streaming": true
     }
